@@ -1,0 +1,7 @@
+pandas>=0.24
+scipy
+numpy
+statsmodels
+patsy
+seaborn
+matplotlib
