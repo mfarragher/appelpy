@@ -1,11 +1,11 @@
 import setuptools
 
-with open("README.md", "r", encoding="utf8") as f:
+with open("README.rst", "r", encoding="utf8") as f:
     long_description = f.read()
 
 setuptools.setup(
     name="appelpy",
-    version="0.0.1",
+    version="0.0.2",
     author="Mark Farragher",
     description="Applied Econometrics Library for Python",
     long_description=long_description,
@@ -18,7 +18,7 @@ setuptools.setup(
     install_requires=["pandas>=0.24",
                       "scipy",
                       "numpy",
-                      "statsmodels", "patsy",
+                      "statsmodels>=0.8", "patsy",
                       "seaborn",
                       "matplotlib"],
     license="BSD",
