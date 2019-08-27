@@ -1,7 +1,22 @@
+import sys
+import os
 import pandas as pd
 import numpy as np
 import itertools
 __all__ = ['DummyEncoder', 'InteractionEncoder']
+
+
+class _SuppressPrints:
+    """For internal use to suppress print output from Statsmodels that
+    is not wanted in Appelpy.
+    """
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self._original_stdout
 
 
 class DummyEncoder:
