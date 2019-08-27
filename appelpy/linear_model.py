@@ -41,6 +41,8 @@ class WLS:
             - 'HC3': robust standard errors obtained via HCCM estimates.
                 Recommended by by Long & Ervin (1999) where number of
                 observations < 250.
+        alpha (float, optional): Defaults to 0.05.  The significance level
+            used for reporting confidence intervals in the model summary.
 
     Methods:
         diagnostic_plot: create a plot for regression diagnostics,
@@ -83,10 +85,11 @@ class WLS:
         X
         y
         w
+        alpha
     """
 
     def __init__(self, df, y_list, regressors_list, w=None,
-                 cov_type='nonrobust'):
+                 cov_type='nonrobust', alpha=0.05):
         """Initializes the WLS model object."""
         # Model inputs (attributes from arguments):
         [y_name] = y_list  # sequence unpacking in order to make Series
@@ -98,6 +101,7 @@ class WLS:
             self._X = df[regressors_list]  # Pandas dataframe
         self._cov_type = cov_type
         self._w = w
+        self._alpha = alpha
 
         # Fit model
         self._regress()
@@ -138,6 +142,12 @@ class WLS:
             < 250.
         """
         return self._cov_type
+
+    @property
+    def alpha(self):
+        """Float: the significance level used for confidence intervals and
+        p-values in the model summary."""
+        return self._alpha
 
     @property
     def y_model(self):
@@ -261,7 +271,7 @@ class WLS:
         print("Model fitting in progress...")
         self._results = model.fit(cov_type=self._cov_type)
         print("Model fitted.")
-        self._results_output = self._results.summary()
+        self._results_output = self._results.summary(alpha=self._alpha)
         self._resid_model = self._results.resid
 
         model_selection_dict = {"Root MSE": np.sqrt(self._results.mse_resid),
@@ -537,6 +547,8 @@ class OLS(WLS):
             - 'HC3': robust standard errors obtained via HCCM estimates.
                 Recommended by by Long & Ervin (1999) where number of
                 observations < 250.
+        alpha (float, optional): Defaults to 0.05.  The significance level
+            used for reporting confidence intervals in the model summary.
 
     Methods:
         diagnostic_plot: create a plot for regression diagnostics,
@@ -577,9 +589,11 @@ class OLS(WLS):
         cov_type
         X
         y
+        alpha
     """
 
-    def __init__(self, df, y_list, regressors_list, cov_type='nonrobust'):
+    def __init__(self, df, y_list, regressors_list,
+                 cov_type='nonrobust', alpha=0.05):
         """Initializes the OLS model object."""
         # Model inputs (attributes from arguments):
         [y_name] = y_list  # sequence unpacking in order to make Series
@@ -590,6 +604,7 @@ class OLS(WLS):
         else:
             self._X = df[regressors_list]  # Pandas dataframe
         self._cov_type = cov_type
+        self._alpha = alpha
 
         # Fit model
         self._regress()
@@ -619,7 +634,7 @@ class OLS(WLS):
         print("Model fitting in progress...")
         self._results = model.fit(cov_type=self._cov_type)
         print("Model fitted.")
-        self._results_output = self._results.summary()
+        self._results_output = self._results.summary(alpha=self._alpha)
         self._resid_model = self._results.resid
 
         model_selection_dict = {"Root MSE": np.sqrt(self._results.mse_resid),
