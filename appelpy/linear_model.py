@@ -257,13 +257,13 @@ class WLS:
         y_notna = self._y.dropna(axis='index')
         indices = list(set(X_notna.index).intersection(set(y_notna.index)))
 
-        self._X_model = self._X.iloc[indices]
-        self._y_model = self._y.iloc[indices]
+        self._X_model = self._X.loc[indices]
+        self._y_model = self._y.loc[indices]
         if self._w is None:
             self._w_model = np.ones(len(self._y_model))  # OLS
             print("No weights specified.  Model will be equivalent to OLS.")
         else:
-            self._w_model = self._w.iloc[indices]
+            self._w_model = self._w.loc[indices]
 
         model = sm.WLS(self._y_model, sm.add_constant(self._X_model),
                        weights=self._w_model, has_const=True)
@@ -470,7 +470,7 @@ class WLS:
         if indices_significant.size == 0:
             return None
         else:
-            return regressor_pvalues.iloc[indices_significant].index.to_list()
+            return regressor_pvalues.loc[indices_significant].index.to_list()
 
     def diagnostic_plot(self, plot_name, ax=None):
         """Return a regression diagnostic plot.
@@ -626,8 +626,8 @@ class OLS(WLS):
         X_notna = self._X.dropna(axis='index')
         y_notna = self._y.dropna(axis='index')
         indices = list(set(X_notna.index).intersection(set(y_notna.index)))
-        self._X_model = self._X.iloc[indices]
-        self._y_model = self._y.iloc[indices]
+        self._X_model = self._X.loc[indices]
+        self._y_model = self._y.loc[indices]
 
         model = sm.OLS(self._y_model, sm.add_constant(self._X_model))
 

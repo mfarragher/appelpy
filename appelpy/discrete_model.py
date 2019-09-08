@@ -45,7 +45,7 @@ class Logit:
         odds_ratios (pd.Series): odds ratio for each regressor in the model.
         log_likelihood (float): value of the log-likelihood for the model.
         results (Statsmodels object): stores information from the Statsmodels
-            OLS regression.
+            Logit regression.
         resid_model (pd.Series): residuals obtained from the fitted model.
         resid_model_standardized (pd.Series): standardized residuals obtained
             from the fitted model.
@@ -121,7 +121,7 @@ class Logit:
     # MODEL OUTPUTS & STATES
     @property
     def results(self):
-        """statsmodels.regression.linear_model.RegressionResultsWrapper object
+        """statsmodels.discrete.discrete_model.LogitResults object.
         The object contains many details on the fit of the regression model.
         There are dozens of attributes that store such information.
 
@@ -129,7 +129,7 @@ class Logit:
         - results_output: the object returned by results.summary()
         - model_selection_stats: an assortment of measures contained in
             results, which are used commonly for model selection
-            (e.g. AIC, R-squared)
+            (e.g. log-likelihood)
         """
         return self._results
 
@@ -206,8 +206,8 @@ class Logit:
         X_notna = self._X.dropna(axis='index')
         y_notna = self._y.dropna(axis='index')
         indices = list(set(X_notna.index).intersection(set(y_notna.index)))
-        self._X_model = self._X.iloc[indices]
-        self._y_model = self._y.iloc[indices]
+        self._X_model = self._X.loc[indices]
+        self._y_model = self._y.loc[indices]
 
         model = sm.Logit(self._y_model, sm.add_constant(self._X_model))
 
@@ -400,4 +400,4 @@ class Logit:
         if indices_significant.size == 0:
             return None
         else:
-            return regressor_pvalues.iloc[indices_significant].index.to_list()
+            return regressor_pvalues.loc[indices_significant].index.to_list()
