@@ -1,13 +1,17 @@
 import numpy as np
+import scipy as sp
 import pandas as pd
 import statsmodels.api as sm
+import statsmodels.stats.api as sms
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-__all__ = ['plot_residuals_vs_fitted_values',
+__all__ = ['BadApples',
+           'plot_residuals_vs_fitted_values',
            'plot_residuals_vs_predicted_values',
            'pp_plot', 'qq_plot',
-           'variance_inflation_factors']
+           'variance_inflation_factors',
+           'heteroskedasticity_test']
 
 
 def plot_residuals_vs_fitted_values(residual_values, fitted_values,
@@ -150,3 +154,359 @@ def variance_inflation_factors(X, vif_threshold=10):
                           name="VIF>" + str(vif_threshold))
     # Final dataframe:
     return pd.concat([vif, tol, vif_thres], axis='columns')
+
+
+class BadApples:
+    """The BadApples class takes an appelpy model object and can provide
+    diagnostics of extreme observations.  It calculates measures of
+    influence, leverage and outliers in the model.
+
+    With k independent variables and n observations, the class calculates
+    these measures and flags observations as extreme based on the specified
+    heuristics:
+
+    INFLUENCE:
+    - dfbeta (for each independent variable): DFBETA diagnostic.
+        Extreme if val > 2 / sqrt(n)
+    - dffits (for each independent variable): DFFITS diagnostic.
+        Extreme if val > 2 * sqrt(k / n)
+    - cooks_d: Cook's distance.  Extreme if val > 4 / n
+    LEVERAGE:
+    - leverage: value from hat matrix diagonal.  Extreme if
+        val > (2*k + 2) / n
+    OUTLIERS:
+    - resid_standard: standardized residual.  Extreme if
+        |val| > 2, i.e. approx. 5% of observations will be
+        flagged.
+    - resid_student: studentized residual.  Extreme if
+        |val| > 2, i.e. approx. 5% of observations will be
+        flagged.
+
+    These measures are available in Statsmodels via the get_influence
+    method on a regression object, but Appelpy does a decomposition of
+    these measures into leverage, outliers and influence.
+
+    Args:
+        appelpy_model_object: the object that contains the info about a model
+            fitted with Appelpy.  e.g. for OLS regression the object would
+            be of the type appelpy.linear_model.OLS.
+
+    Methods:
+        show_extreme_observations: return a dataframe that shows values that
+            have high influence, high leverage or are outliers, based on
+            at least one heuristic.
+        plot_leverage_vs_residuals_squared: plot the model's leverage values
+            on the normalized residuals squared.  The equivalent command in
+            Stata is lvr2plot.
+
+    Attributes:
+        measures_influence (pd.DataFrame): dataframe with measures of
+            influence, including: dfbeta for each independent variable;
+            dffits for each independent variable; Cook's distance (cooks_d)
+        measures_leverage (pd.Series): a series with the leverage values by
+            observation.  These values are from the diagonal of the hat
+            matrix.
+        measures_outliers (pd.DataFrame): dataframe with residual measures,
+            namely the standardized residuals (resid_standard) and
+            Studentized residuals (resid_student).
+        indices_high_influence (list): list of indices of X_model (i.e.
+            observations) that have high influence on at least one
+            measure.
+        indices_high_leverage (list): list of indices of X_model (i.e.
+            observations) that have high leverage based on a heuristic.
+        indices_outliers (list): list of indices of X_model (i.e.
+            observations) that are viewed as outliers based on a heuristic.
+
+    Attributes (auxiliary - used to store arguments or inputs):
+        appelpy_model_object
+        y_model
+        X_model
+
+    """
+    def __init__(self, appelpy_model_object):
+        # Inputs and model info
+        self._appelpy_model_object = appelpy_model_object
+        self._y_model = appelpy_model_object.y_model
+        self._X_model = appelpy_model_object.X_model
+        # Outputs
+        self._measures_influence = None
+        self._measures_leverage = None
+        self._measures_outliers = None
+        self._indices_high_influence = None
+        self._indices_high_leverage = None
+        self._indices_outliers = None
+
+        # Calculate outliers, leverage and influence:
+        print('Calculating influence measures...')
+        self._calculate()
+        self._calculate_heuristics()
+        print('Calculations saved to object.')
+
+    @property
+    def X_model(self):
+        """pd.DataFrame: exogenous variables (only the values used in
+        the model)"""
+        return self._X_model
+
+    @property
+    def measures_influence(self):
+        """pd.DataFrame: measures of influence per observation in the
+        model."""
+        return self._measures_influence
+
+    @property
+    def measures_leverage(self):
+        """pd.Series: leverage values per observation in the model."""
+        return self._measures_leverage
+
+    @property
+    def measures_outliers(self):
+        """pd.DataFrame: measures of outliers per observation in the model."""
+        return self._measures_outliers
+
+    @property
+    def indices_high_influence(self):
+        """list: indices that have a high value (based on a heuristic) for
+        at least one of the influence measures."""
+        return self._indices_high_influence
+
+    @property
+    def indices_high_leverage(self):
+        """list: indices that have a high value (based on a heuristic) for
+        the leverage measure."""
+        return self._indices_high_leverage
+
+    @property
+    def indices_outliers(self):
+        """list: indices that have a high value (based on a heuristic) for
+        at least one of the outlier measures."""
+        return self._indices_outliers
+
+    def _calculate(self):
+        # Statsmodels object
+        influence_obj = self._appelpy_model_object.results.get_influence()
+
+        # Get Statsmodels calcs - but tidy them up for Appelpy
+        influence = influence_obj.summary_frame()
+        influence.columns = ['_'.join(['dfbeta', col[4:]])
+                             if col.startswith('dfb_')
+                             else col
+                             for col in influence]
+
+        # Decomposition of Statsmodels influence object
+        self._measures_outliers = influence[['standard_resid',
+                                             'student_resid']].copy()
+        self._measures_outliers.columns = ['resid_standard',
+                                           'resid_student']
+        self._measures_leverage = influence['hat_diag'].rename('leverage').copy()
+        self._measures_influence = influence.drop(
+            columns=['standard_resid', 'student_resid', 'hat_diag']).copy()
+
+        pass
+
+    def _calculate_heuristics(self):
+        if self._X_model.ndim == 1:
+            k = 1
+            n = len(self._X_model)
+        else:
+            n, k = self._X_model.shape
+        # Leverage points:
+        self._indices_high_leverage = (self._measures_leverage[(self._measures_leverage >
+                                                                (2*k + 2) /
+                                                                n)]
+                                       .index.tolist())
+
+        # Outlier points:
+        outlier_points = []
+        for col in self._measures_outliers.columns:
+            indices = (self._measures_outliers[self._measures_outliers[col].abs() > 2]
+                       .index.tolist())
+            outlier_points.extend(indices)
+        # Return list of indices (without duplicates)
+        outlier_points = np.unique(outlier_points).tolist()
+        self._indices_outliers = outlier_points
+
+        # Influence points:
+        influence_points = []
+        for col in self._measures_influence.columns[(self._measures_influence.columns
+                                                     .str.startswith('dfbeta'))].tolist():
+            indices = (self._measures_influence[(self._measures_influence[col].abs() >
+                                                 2 / np.sqrt(n))]
+                       .index.tolist())
+            influence_points.extend(indices)
+        for col in self._measures_influence.columns[(self._measures_influence.columns
+                                                     .str.startswith('dffits'))].tolist():
+            indices = (self._measures_influence[(self._measures_influence[col].abs() >
+                                                 2 * np.sqrt(k / n))]
+                       .index.tolist())
+            influence_points.extend(indices)
+        indices_cooks = (self._measures_influence[(self._measures_influence['cooks_d'] >
+                                                   4 / n)]
+                         .index.tolist())
+        influence_points.extend(indices_cooks)
+        # Return list of indices (without duplicates)
+        influence_points = np.unique(influence_points).tolist()
+        self._indices_high_influence = influence_points
+
+        pass
+
+    def show_extreme_observations(self):
+        """Return a dataframe that shows values that have high influence,
+        high leverage or are outliers, based on at least one heuristic.
+
+        Returns:
+            pd.DataFrame: a subset of extreme observations from X_model.
+        """
+        extreme_indices_list = list(set().union(self._indices_high_leverage,
+                                                self._indices_outliers,
+                                                self._indices_high_influence))
+
+        if len(extreme_indices_list) == 0:
+            print('No extreme observations found.')
+            return None
+        else:
+            df = pd.concat([self._y_model, self._X_model], axis='columns')
+            return df[df.index.isin(extreme_indices_list)].copy()
+
+    def _calculate_leverage_vs_residuals_squared(self, rescale=False):
+        df = pd.DataFrame(index=self._measures_leverage.index,
+                          columns=['leverage', 'resid_score'])
+        df['leverage'] = self._measures_leverage
+
+        if rescale:
+            df['resid_score'] = pd.Series((self._measures_outliers['resid_standard'] ** 2 /
+                                           len(self._measures_outliers)),
+                                          index=self._measures_outliers.index)
+        else:
+            df['resid_score'] = pd.Series(self._measures_outliers['resid_standard'] ** 2,
+                                          index=self._measures_outliers.index)
+
+        return df
+
+    def plot_leverage_vs_residuals_squared(self, annotate=False,
+                                           rescale=False, ax=None):
+        """Produce a scatterplot of observations' leverage values
+        (y-axis) on their normalized residuals squared (x-axis).  In
+        Stata, the equivalent plot would be produced via the lvr2plot
+        command.
+
+        The horizontal line signifies the mean leverage value
+        and the vertical line signifies the mean normalized residual
+        squared.
+
+        Scatterplot annotations are not shown by default.
+        Set rescale=True to divide the normalized residual squared
+        values by the number of observations.
+
+        Args:
+            annotate (bool, optional): Annotate the scatterplot points
+                with the index value if a point has a residual higher
+                than average or leverage higher than average.  Defaults
+                to False.
+            rescale (bool, optional): Divide the normalized residual squares
+                by the number of observations.  Stata does that rescaling
+                in its lvr2plot.  Defaults to False.
+            ax (Axes object, optional): Matplotlib Axes object
+
+        Returns:
+            Figure object
+        """
+        if ax is None:
+            ax = plt.gca()
+
+        leverage_mean = self._measures_leverage.mean()
+
+        plot_df = self._calculate_leverage_vs_residuals_squared(
+            rescale=rescale)
+        if rescale:
+            resid_mean = plot_df['resid_score'].mean()
+            fig = plt.scatter(plot_df['resid_score'],
+                              self._measures_leverage.values)
+            ax.set_xlabel(
+                r"Normalized $resid^{2}$ / total observations")
+        else:
+            resid_mean = plot_df['resid_score'].mean()
+            fig = plt.scatter(plot_df['resid_score'],
+                              self._measures_leverage.values)
+            ax.set_xlabel(r"Normalized $resid^{2}$")
+        ax.set_ylabel("Leverage")
+        ax.axvline(resid_mean, linestyle='--', color='gray')
+        ax.axhline(leverage_mean, linestyle='--', color='gray')
+        ax.set_title("Leverage vs Normalized Residuals Squared Plot")
+
+        # Annotate only the points with high leverage or high residual:
+        if annotate:
+            plot_df['leverage_hi'] = np.where(
+                plot_df['leverage'] > leverage_mean, 1, 0)
+            plot_df['resid_score_hi'] = np.where(
+                plot_df['resid_score'] > resid_mean, 1, 0)
+            plot_df['annotate'] = np.where(
+                (plot_df['leverage_hi'] | plot_df['resid_score_hi']), 1, 0)
+
+            for index, row in plot_df[plot_df['annotate'] == 1].iterrows():
+                ax.annotate(index, (row['resid_score'], row['leverage']),
+                            xytext=(3, 3),
+                            textcoords='offset points')
+
+        return fig
+
+
+def heteroskedasticity_test(test_name, appelpy_model_object,
+                            regressors_subset=None):
+    """Return the results of a heteroskedasticity test given a model.
+
+    Supported tests:
+    - 'breusch_pagan': equivalent to Stata's `hettest` command.
+    - 'white': equivalent to Stata's `imtest, white` command.
+
+    Args:
+        test_name (str): either 'breusch_pagan' or 'white'.
+        appelpy_model_object: the object that contains the info about a model
+            fitted with Appelpy.  e.g. for OLS regression the object would
+            be of the type appelpy.linear_model.OLS.
+        regressors_subset (list, optional): For breusch_pagan, this can be
+            set so that the test runs on a subset of regressors. Defaults to
+            None.
+
+    Raises:
+        ValueError: Choose one of 'breusch_pagan' or 'white' as a test name.
+        ValueError: Check the regressors_subset items were used in the model.
+
+    Returns:
+        test_statistic, p_value: the test statistic and the corresponding
+            p-value.
+    """
+    if test_name not in ['breusch_pagan', 'white']:
+        raise ValueError(
+            "Choose one of 'breusch_pagan' or 'white' as a test name.")
+
+    if test_name == 'breusch_pagan':
+        # Get residuals (from model object or run again on a regressors subset)
+        if regressors_subset:
+            if not set(regressors_subset).issubset(set(appelpy_model_object.X.columns)):
+                raise ValueError(
+                    'Regressor(s) not recognised in dataset.  Check the list given to the function.')
+            reduced_model = sm.OLS(appelpy_model_object.y,
+                                   sm.add_constant(appelpy_model_object.X[regressors_subset])).fit()
+            sq_resid = (reduced_model.resid ** 2).to_numpy()
+        else:
+            sq_resid = (appelpy_model_object.resid_model ** 2).to_numpy()
+
+        # Scale the residuals
+        scaled_sq_resid = sq_resid / sq_resid.mean()
+        y_hat = appelpy_model_object.results.fittedvalues.to_numpy()
+
+        # Model of norm resid on y_hat
+        aux_model = sm.OLS(scaled_sq_resid, sm.add_constant(y_hat)).fit()
+
+        # Calculate test stat and pval
+        lm = aux_model.ess / 2
+        pval = sp.stats.chi2.sf(lm, 1)  # dof=1
+        return lm, pval
+
+    if test_name == 'white':
+        if regressors_subset:
+            print("Ignoring regressors_subset.  White test will use original regressors.")
+        white_test = sms.het_white(appelpy_model_object.resid_model,
+                                   sm.add_constant(appelpy_model_object.X_model))
+        return white_test[0], white_test[1]  # lm, pval
