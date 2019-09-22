@@ -468,9 +468,9 @@ class WLS:
         indices_significant = np.where(regressor_pvalues <= alpha)[0]
         # Return the names of significant regressors as a list
         if indices_significant.size == 0:
-            return None
+            return []
         else:
-            return regressor_pvalues.loc[indices_significant].index.to_list()
+            return regressor_pvalues.iloc[indices_significant].index.to_list()
 
     def diagnostic_plot(self, plot_name, ax=None):
         """Return a regression diagnostic plot.
