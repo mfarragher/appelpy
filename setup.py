@@ -5,7 +5,7 @@ with open("README.rst", "r", encoding="utf8") as f:
 
 setuptools.setup(
     name="appelpy",
-    version="0.1.0",
+    version="0.1.1",
     author="Mark Farragher",
     description="Applied Econometrics Library for Python",
     long_description=long_description,

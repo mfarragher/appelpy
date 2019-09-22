@@ -1,3 +1,9 @@
+.. image:: https://badge.fury.io/py/appelpy.svg
+    :target: https://badge.fury.io/py/appelpy
+
+.. image:: https://img.shields.io/badge/License-BSD%203--Clause-blue.svg
+    :target: https://github.com/mfarragher/appelpy/blob/master/LICENSE.txt
+
 ===================================================
 appelpy: Applied Econometrics Library for Python
 ===================================================
