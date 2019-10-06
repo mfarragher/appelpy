@@ -10,6 +10,7 @@ class _SuppressPrints:
     """For internal use to suppress print output from Statsmodels that
     is not wanted in Appelpy.
     """
+
     def __enter__(self):
         self._original_stdout = sys.stdout
         sys.stdout = open(os.devnull, 'w')
@@ -17,6 +18,53 @@ class _SuppressPrints:
     def __exit__(self, exc_type, exc_val, exc_tb):
         sys.stdout.close()
         sys.stdout = self._original_stdout
+
+
+def _df_input_conditions(X, y):
+    if isinstance(X, pd.Series):
+        if (y.isin([np.inf, -np.inf]).any() or
+                X.isin([np.inf, -np.inf]).any()):
+            raise ValueError(
+                '''Remove infinite (positive or negative) values from the
+                dataset before modelling.''')
+    else:
+        if (y.isin([np.inf, -np.inf]).any() or
+                len(X[X.isin([np.inf, -np.inf]).any(1)]) > 0):
+            raise ValueError(
+                '''Remove infinite (positive or negative) values from the
+                dataset before modelling.''')
+
+    if isinstance(X, pd.Series):
+        if (pd.api.types.is_categorical_dtype(X.dtype) or
+                pd.api.types.is_categorical_dtype(y.dtype)):
+            raise TypeError(
+                '''Encode dummies from Pandas Category column(s) before
+                modelling.''')
+    else:
+        if (len(X.select_dtypes(['category']).columns.tolist()) > 0
+            or
+                pd.api.types.is_categorical_dtype(y.dtype)):
+            raise TypeError(
+                '''Encode dummies from Pandas Category column(s) before
+                modelling.''')
+
+    if isinstance(X, pd.Series):
+        if (pd.api.types.is_string_dtype(X.dtype) or
+                pd.api.types.is_string_dtype(y.dtype)):
+            raise TypeError(
+                '''Remove columns with string data before modelling.  If
+                categorical data, then use their dummy columns in model.''')
+    else:
+        if (len(X.select_dtypes(['O']).columns.tolist()) > 0 or
+                pd.api.types.is_string_dtype(y.dtype)):
+            raise TypeError(
+                '''Remove columns with string data before modelling.  If
+                categorical data, then use their dummy columns in model.''')
+
+    if y.isnull().values.any() or X.isnull().values.any():
+        raise ValueError(
+            '''Remove observations with NaN values before modelling.''')
+    pass
 
 
 class DummyEncoder:
@@ -182,7 +230,8 @@ class DummyEncoder:
 
             # Remove base
             if base_level is not None:  # 'is not None' will allow 0, 0.0 to pass
-                base_level_col_str = ''.join([col, self._separator, str(base_level)])
+                base_level_col_str = ''.join(
+                    [col, self._separator, str(base_level)])
                 del dummy_cols[base_level_col_str]
             # Concat dataframe and dummies
             processed_df = pd.concat([processed_df, dummy_cols],
@@ -294,7 +343,8 @@ class InteractionEncoder:
                 col_other_dtype = self._df[col_other].dtype.name
 
                 # Truth conditions for whether each column is Boolean
-                col_bool = self._df[col_name].isin([0, 1, np.NaN]).all()  # all non-NaN Series vals are in {0, 1}
+                # all non-NaN Series vals are in {0, 1}
+                col_bool = self._df[col_name].isin([0, 1, np.NaN]).all()
                 col_other_bool = self._df[col_other].isin([0, 1, np.NaN]).all()
 
                 # Create dummy columns from the original columns
@@ -302,7 +352,8 @@ class InteractionEncoder:
                     # Use original
                     col_dummies = pd.Series(self._df[col_name], name=col_name)
                 if col_dtype == 'category':
-                    col_dummies = pd.get_dummies(self._df[col_name], prefix=str(col_name))
+                    col_dummies = pd.get_dummies(
+                        self._df[col_name], prefix=str(col_name))
                 if col_other_bool:
                     col_other_dummies = pd.Series(self._df[col_other],
                                                   name=col_other)
@@ -321,7 +372,8 @@ class InteractionEncoder:
                 # 1) Both cols are Boolean:
                 # Straightforward case - add to df one column that multiplies both cols
                 if col_bool and col_other_bool:
-                    interaction_term = "#".join(str(col) for col in (col_name, col_other))
+                    interaction_term = "#".join(str(col)
+                                                for col in (col_name, col_other))
                     interaction_dummy = pd.Series(col_dummies * col_other_dummies,
                                                   name=interaction_term,
                                                   dtype=pd.Int64Dtype())
@@ -333,7 +385,8 @@ class InteractionEncoder:
                 # Straightforward case - add to df one column that multiplies both cols
                 if ((col_dtype != 'category' and not col_bool)
                         and (col_other_dtype != 'category' and not col_other_bool)):
-                    interaction_term = "#".join(str(col) for col in (col_name, col_other))
+                    interaction_term = "#".join(str(col)
+                                                for col in (col_name, col_other))
                     processed_df[interaction_term] = (processed_df[col_name]
                                                       * processed_df[col_other])
                     continue
@@ -358,7 +411,8 @@ class InteractionEncoder:
                     # Remove original non-categorical cols and replace with dummies:
                     dummy_encoder = DummyEncoder(processed_df,
                                                  separator=self._separator)
-                    processed_df = dummy_encoder.encode({col_name: None, col_other: None})
+                    processed_df = dummy_encoder.encode(
+                        {col_name: None, col_other: None})
                     # Add interaction cols:
                     processed_df = pd.concat([processed_df, interaction_dummies_df],
                                              axis='columns')
@@ -401,7 +455,8 @@ class InteractionEncoder:
                 # One Boolean col and one continuous col:
                 # 6)
                 if col_bool and col_other_dtype != 'category':
-                    interaction_term = "#".join(str(col) for col in (col_name, col_other))
+                    interaction_term = "#".join(str(col)
+                                                for col in (col_name, col_other))
                     interaction_dummy = pd.Series(col_dummies * self._df[col_other],
                                                   name=interaction_term)
                     processed_df = pd.concat([processed_df, interaction_dummy],
@@ -409,7 +464,8 @@ class InteractionEncoder:
                     continue
                 # 7)
                 if col_dtype != 'category' and col_other_bool:
-                    interaction_term = "#".join(str(col) for col in (col_name, col_other))
+                    interaction_term = "#".join(str(col)
+                                                for col in (col_name, col_other))
                     interaction_dummy = pd.Series(self._df[col_name] * col_other_dummies,
                                                   name=interaction_term)
                     processed_df = pd.concat([processed_df, interaction_dummy],
@@ -422,7 +478,8 @@ class InteractionEncoder:
                                                 and not col_other_bool):
                     for combo in itertools.product(col_dummies.columns.values, [col_other]):
                         col_value, col_other = combo
-                        interaction_term = "#".join(str(col) for col in (col_value, col_other))
+                        interaction_term = "#".join(
+                            str(col) for col in (col_value, col_other))
                         interaction_dummies_df[interaction_term] = (col_dummies[col_value]
                                                                     * self._df[col_other])
                     # Remove original non-categorical cols and replace with dummies:
@@ -437,7 +494,8 @@ class InteractionEncoder:
                 if (col_dtype != 'category' and not col_bool) and col_other_dtype == 'category':
                     for combo in itertools.product([col_name], col_other_dummies.columns.values):
                         col_name, col_other_value = combo
-                        interaction_term = "#".join(str(col) for col in (col_name, col_other_value))
+                        interaction_term = "#".join(
+                            str(col) for col in (col_name, col_other_value))
                         interaction_dummies_df[interaction_term] = (col_other_dummies[col_other_value]
                                                                     * self._df[col_name])
                     # Remove original non-categorical cols and replace with dummies:

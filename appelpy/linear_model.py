@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from .diagnostics import (plot_residuals_vs_fitted_values,
                           plot_residuals_vs_predicted_values,
                           pp_plot, qq_plot)
+from .utils import _df_input_conditions
 __all__ = ['WLS', 'OLS']
 
 
@@ -43,6 +44,8 @@ class WLS:
                 observations < 250.
         alpha (float, optional): Defaults to 0.05.  The significance level
             used for reporting confidence intervals in the model summary.
+        printing (Bool, optional): display print statements for function calls.
+            Defaults to True.
 
     Methods:
         diagnostic_plot: create a plot for regression diagnostics,
@@ -64,32 +67,25 @@ class WLS:
             standardized estimates.  NOT suitable for print statements.
         results (Statsmodels object): stores information from the Statsmodels
             OLS regression.
-        resid_model (pd.Series): residuals obtained from the fitted model.
-        resid_model_standardized (pd.Series): standardized residuals obtained
+        resid (pd.Series): residuals obtained from the fitted model.
+        resid_standardized (pd.Series): standardized residuals obtained
             from the fitted model.
-        y_model (pd.Series): contains the values of the independent variable
-            for the observations that were used to fit the model.  If an
-            observation is missing values from either X or y, then it will not
-            appear in this dataframe.
-        y_model_standardized (pd.Series): y_model in the form of standardized
+        y (pd.Series): contains the values of the independent variable
+            for the observations that were used to fit the model.
+        y_standardized (pd.Series): y in the form of standardized
             estimates.
-        X_model (pd.DataFrame): contains the values of the regressors for the
-            observations used to fit the model.  If an observation is missing
-            values from either X or y, then it will not appear in this
-            dataframe.
-        X_model_standardized (pd.DataFrame): X_model in the form of
+        X (pd.DataFrame): contains the values of the regressors for the
+            observations used to fit the model.
+        X_standardized (pd.DataFrame): X in the form of
             standardized estimates.
-        w_model (pd.Series): weight for each observation used in the model.
     Attributes (auxiliary - used to store arguments):
         cov_type
-        X
-        y
         w
         alpha
     """
 
     def __init__(self, df, y_list, regressors_list, w=None,
-                 cov_type='nonrobust', alpha=0.05):
+                 cov_type='nonrobust', alpha=0.05, printing=True):
         """Initializes the WLS model object."""
         # Model inputs (attributes from arguments):
         [y_name] = y_list  # sequence unpacking in order to make Series
@@ -104,7 +100,7 @@ class WLS:
         self._alpha = alpha
 
         # Fit model
-        self._regress()
+        self._regress(printing=printing)
         self._standardize_results()
 
     # MODEL INPUTS
@@ -150,34 +146,16 @@ class WLS:
         return self._alpha
 
     @property
-    def y_model(self):
-        """pd.Series: endogenous variable (only the values used in
-        the model)"""
-        return self._y_model
-
-    @property
-    def X_model(self):
-        """pd.DataFrame: exogenous variables (only the values used in
-        the model)"""
-        return self._X_model
-
-    @property
-    def w_model(self):
-        """pd.Series: weight for each observation (only the values used in
-        the model)"""
-        return self._w_model
-
-    @property
-    def y_model_standardized(self):
+    def y_standardized(self):
         """pd.Series: endogenous variable standardized (only the values
         used in the model)"""
-        return self._y_model_standardized
+        return self._y_standardized
 
     @property
-    def X_model_standardized(self):
+    def X_standardized(self):
         """pd.DataFrame: exogenous variables standardized (only the values
         used in the model)"""
-        return self._X_model_standardized
+        return self._X_standardized
 
     # MODEL OUTPUTS & STATES
     @property
@@ -235,12 +213,12 @@ class WLS:
         return self._results_output_standardized
 
     @property
-    def resid_model(self):
-        return self._resid_model
+    def resid(self):
+        return self._resid
 
     @property
-    def resid_model_standardized(self):
-        return self._resid_model_standardized
+    def resid_standardized(self):
+        return self._resid_standardized
 
     @property
     def model_selection_stats(self):
@@ -251,28 +229,19 @@ class WLS:
         """
         return self._model_selection_stats
 
-    def _regress(self):
-        # Drop any rows with NaNs
-        X_notna = self._X.dropna(axis='index')
-        y_notna = self._y.dropna(axis='index')
-        indices = list(set(X_notna.index).intersection(set(y_notna.index)))
+    def _regress(self, printing=True):
+        _df_input_conditions(self._X, self._y)
 
-        self._X_model = self._X.loc[indices]
-        self._y_model = self._y.loc[indices]
-        if self._w is None:
-            self._w_model = np.ones(len(self._y_model))  # OLS
-            print("No weights specified.  Model will be equivalent to OLS.")
-        else:
-            self._w_model = self._w.loc[indices]
+        model = sm.WLS(self._y, sm.add_constant(self._X),
+                       weights=self._w, has_const=True)
 
-        model = sm.WLS(self._y_model, sm.add_constant(self._X_model),
-                       weights=self._w_model, has_const=True)
-
-        print("Model fitting in progress...")
+        if printing:
+            print("Model fitting in progress...")
         self._results = model.fit(cov_type=self._cov_type)
-        print("Model fitted.")
+        if printing:
+            print("Model fitted.")
         self._results_output = self._results.summary(alpha=self._alpha)
-        self._resid_model = self._results.resid
+        self._resid = self._results.resid
 
         model_selection_dict = {"Root MSE": np.sqrt(self._results.mse_resid),
                                 "R-squared": self._results.rsquared,
@@ -291,24 +260,24 @@ class WLS:
         - Fit model on standardized X and y
         - Gather relevant estimates in a Pandas DataFrame & set to attribute
         """
-        # Drop any rows with NaNs (requires X_model and y_model)
+        # Drop any rows with NaNs (requires X and y)
 
         # Standardization accounts for NaN values (via Pandas)
-        w_stats_tuple = self._get_weighted_stats(self._X_model, self._y_model,
+        w_stats_tuple = self._get_weighted_stats(self._X, self._y,
                                                  self._w)
         mean_Xw, mean_yw = w_stats_tuple[0], w_stats_tuple[1]
         stdev_X, stdev_y = w_stats_tuple[2], w_stats_tuple[3]
         # Standard error for weighted X vars:
-        Xw_mean_se = (self._X_model - mean_Xw) / stdev_X
+        Xw_mean_se = (self._X - mean_Xw) / stdev_X
         # Standard error for weighted y:
-        yw_mean_se = (self._y_model - mean_yw) / stdev_y
+        yw_mean_se = (self._y - mean_yw) / stdev_y
 
         # Model fitting
         model_standardized = sm.WLS(yw_mean_se, sm.add_constant(Xw_mean_se),
-                                    weights=self._w_model)
+                                    weights=self._w)
         results_obj = model_standardized.fit(cov_type=self._cov_type)
-        self._resid_model_standardized = pd.Series(self._results.resid_pearson,
-                                                   index=self._resid_model.index)
+        self._resid_standardized = pd.Series(self._results.resid_pearson,
+                                             index=self._resid.index)
 
         # Initialize dataframe (regressors in index only)
         output_indices = results_obj.params.drop('const').index
@@ -346,16 +315,16 @@ class WLS:
         self._results_output_standardized = std_results_output
         pass
 
-    def _get_weighted_stats(self, X_model, y_model, weights):
+    def _get_weighted_stats(self, X, y, weights):
         """Gets the weighted mean and standard deviation for each variable
-        in X_model and y_model, based on an array of weights."""
-        Xw_stat_obj = DescrStatsW(self._X_model, weights=self._w_model, ddof=1)
+        in X and y, based on an array of weights."""
+        Xw_stat_obj = DescrStatsW(self._X, weights=self._w, ddof=1)
 
         # Weighted standard deviation for X vars:
         std_Xw = np.sqrt(np.abs(Xw_stat_obj.var_ddof(1)))  # abs for w_sum <1
         mean_Xw = Xw_stat_obj.mean  # Numpy array shape: (regressors, )
 
-        yw_stat_obj = DescrStatsW(self._y_model, weights=self._w_model, ddof=1)
+        yw_stat_obj = DescrStatsW(self._y, weights=self._w, ddof=1)
         # Weighted standard deviation for y:
         std_yw = np.sqrt(np.abs(yw_stat_obj.var_ddof(1)))  # abs for w_sum <1
         mean_yw = yw_stat_obj.mean  # Numpy array shape: (regressors, )
@@ -385,7 +354,7 @@ class WLS:
             np.ndarray: shape (# examples, ) with a prediction for
             each example.
         """
-        regressors_count = self._X_model.shape[1]
+        regressors_count = self._X.shape[1]
 
         if type(X_predict) != np.ndarray:
             X_predict = X_predict.to_numpy()
@@ -409,8 +378,8 @@ class WLS:
             # to a NaN prediction
             if within_sample and X_predict.ndim == 1:
                 # Series of truth for whether each val is in range
-                vals_in_range = ((self._X_model.min() <= X_predict)
-                                 & (X_predict <= self._X_model.max()))
+                vals_in_range = ((self._X.min() <= X_predict)
+                                 & (X_predict <= self._X.max()))
                 # Series of truth for whether each observation has
                 # all X vals in range
                 all_vals_in_range = vals_in_range.all(axis=0)
@@ -419,10 +388,10 @@ class WLS:
                 X_predict = np.insert(X_predict, 0, 1)
             else:
                 # Truth array `vals_in_range` shape (# examples, # regressors)
-                vals_in_range_min = np.less_equal(np.tile(self._X_model.min().T, (examples_to_predict, 1)),
+                vals_in_range_min = np.less_equal(np.tile(self._X.min().T, (examples_to_predict, 1)),
                                                   X_predict)
                 vals_in_range_max = np.greater_equal(X_predict,
-                                                     np.tile(self._X_model.min().T, (examples_to_predict, 1)))
+                                                     np.tile(self._X.min().T, (examples_to_predict, 1)))
                 vals_in_range = vals_in_range_min & vals_in_range_max
                 # Truth array - shape (# examples, )
                 # for whether each observation has all X vals in range
@@ -461,8 +430,8 @@ class WLS:
             raise ValueError(
                 "Ensure significance level is a float number in range (0, 0.1]")
 
-        regressor_pvalues = self._results.pvalues  # Pandas Series
-        regressor_pvalues.drop('const', inplace=True)
+        regressor_pvalues = (self._results.pvalues
+                             .drop('const'))  # Pandas Series
 
         # Find the integer indices of the significant regressors
         indices_significant = np.where(regressor_pvalues <= alpha)[0]
@@ -509,10 +478,10 @@ class WLS:
             fig = qq_plot(self.results.resid, ax)
         if plot_name == 'rvf_plot':
             fig = plot_residuals_vs_fitted_values(
-                self._y_model, self.results.resid, ax)
+                self._y, self.results.resid, ax)
         if plot_name == 'rvp_plot':
             fig = plot_residuals_vs_predicted_values(
-                self.predict(self._X_model), self.results.resid, ax)
+                self.predict(self._X), self.results.resid, ax)
         return fig
 
 
@@ -549,6 +518,8 @@ class OLS(WLS):
                 observations < 250.
         alpha (float, optional): Defaults to 0.05.  The significance level
             used for reporting confidence intervals in the model summary.
+        printing (Bool, optional): display print statements for function calls.
+            Defaults to True.
 
     Methods:
         diagnostic_plot: create a plot for regression diagnostics,
@@ -570,30 +541,24 @@ class OLS(WLS):
             standardized estimates.  NOT suitable for print statements.
         results (Statsmodels object): stores information from the Statsmodels
             OLS regression.
-        resid_model (pd.Series): residuals obtained from the fitted model.
-        resid_model_standardized (pd.Series): standardized residuals obtained
+        resid (pd.Series): residuals obtained from the fitted model.
+        resid_standardized (pd.Series): standardized residuals obtained
             from the fitted model.
-        y_model (pd.Series): contains the values of the independent variable
-            for the observations that were used to fit the model.  If an
-            observation is missing values from either X or y, then it will not
-            appear in this dataframe.
-        y_model_standardized (pd.Series): y_model in the form of standardized
+        y (pd.Series): contains the values of the independent variable
+            for the observations that were used to fit the model.
+        y_standardized (pd.Series): y in the form of standardized
             estimates.
-        X_model (pd.DataFrame): contains the values of the regressors for the
-            observations used to fit the model.  If an observation is missing
-            values from either X or y, then it will not appear in this
-            dataframe.
-        X_model_standardized (pd.DataFrame): X_model in the form of
+        X (pd.DataFrame): contains the values of the regressors for the
+            observations used to fit the model.
+        X_standardized (pd.DataFrame): X in the form of
             standardized estimates.
     Attributes (auxiliary - used to store arguments):
         cov_type
-        X
-        y
         alpha
     """
 
     def __init__(self, df, y_list, regressors_list,
-                 cov_type='nonrobust', alpha=0.05):
+                 cov_type='nonrobust', alpha=0.05, printing=True):
         """Initializes the OLS model object."""
         # Model inputs (attributes from arguments):
         [y_name] = y_list  # sequence unpacking in order to make Series
@@ -607,7 +572,7 @@ class OLS(WLS):
         self._alpha = alpha
 
         # Fit model
-        self._regress()
+        self._regress(printing=printing)
         self._standardize_results()
 
     @property
@@ -615,27 +580,18 @@ class OLS(WLS):
         """pd.Series: weight for each observation"""
         raise AttributeError("No weights are explicitly set in OLS model.")
 
-    @property
-    def w_model(self):
-        """pd.Series: weight for each observation (only the values used in
-        the model)"""
-        raise AttributeError("No weights are explicitly set in OLS model.")
+    def _regress(self, printing=True):
+        _df_input_conditions(self._X, self._y)
 
-    def _regress(self):
-        # Drop any rows with NaNs
-        X_notna = self._X.dropna(axis='index')
-        y_notna = self._y.dropna(axis='index')
-        indices = list(set(X_notna.index).intersection(set(y_notna.index)))
-        self._X_model = self._X.loc[indices]
-        self._y_model = self._y.loc[indices]
+        model = sm.OLS(self._y, sm.add_constant(self._X))
 
-        model = sm.OLS(self._y_model, sm.add_constant(self._X_model))
-
-        print("Model fitting in progress...")
+        if printing:
+            print("Model fitting in progress...")
         self._results = model.fit(cov_type=self._cov_type)
-        print("Model fitted.")
+        if printing:
+            print("Model fitted.")
         self._results_output = self._results.summary(alpha=self._alpha)
-        self._resid_model = self._results.resid
+        self._resid = self._results.resid
 
         model_selection_dict = {"Root MSE": np.sqrt(self._results.mse_resid),
                                 "R-squared": self._results.rsquared,
@@ -654,21 +610,21 @@ class OLS(WLS):
         - Fit model on standardized X and y
         - Gather relevant estimates in a Pandas DataFrame & set to attribute
         """
-        # Drop any rows with NaNs (requires X_model and y_model)
+        # Drop any rows with NaNs (requires X and y)
 
         # Standardization accounts for NaN values (via Pandas)
-        stdev_X, stdev_y = self._X_model.std(ddof=1), self._y_model.std(ddof=1)
-        self._X_model_standardized = (
-            self._X_model - self._X_model.mean()) / stdev_X
-        self._y_model_standardized = (
-            self._y_model - self._y_model.mean()) / stdev_y
+        stdev_X, stdev_y = self._X.std(ddof=1), self._y.std(ddof=1)
+        self._X_standardized = (
+            self._X - self._X.mean()) / stdev_X
+        self._y_standardized = (
+            self._y - self._y.mean()) / stdev_y
 
         # Model fitting
-        model_standardized = sm.OLS(self._y_model_standardized,
-                                    sm.add_constant(self._X_model_standardized))
+        model_standardized = sm.OLS(self._y_standardized,
+                                    sm.add_constant(self._X_standardized))
         results_obj = model_standardized.fit(cov_type=self._cov_type)
-        self._resid_model_standardized = pd.Series(self._results.resid_pearson,
-                                                   index=self._resid_model.index)
+        self._resid_standardized = pd.Series(self._results.resid_pearson,
+                                             index=self._resid.index)
 
         # Initialize dataframe (regressors in index only)
         output_indices = results_obj.params.drop('const').index

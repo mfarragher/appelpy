@@ -1,4 +1,4 @@
-from .utils import _SuppressPrints
+from .utils import _SuppressPrints, _df_input_conditions
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
@@ -27,6 +27,8 @@ class Logit:
             e.g. ['exper', 'age', 'coll', 'expersq']
         alpha (float, optional): Defaults to 0.05.  The significance level
             used for reporting confidence intervals in the model summary.
+        printing (Bool, optional): display print statements for function calls.
+            Defaults to True.
     Methods:
         predict: predict the probability value(s) of given example(s) based
             on the fitted model.
@@ -34,8 +36,8 @@ class Logit:
             significant for a given significance level (alpha).
 
     Attributes (main):
-        model_selection_stats (dict): Model selection stats such as log-likelihood
-            in one place.
+        model_selection_stats (dict): Model selection stats such as
+            log-likelihood in one place.
         results_output (Statsmodels Summary): Summary object that displays the
             main results from the model.  Suitable for printing in various
             formats.
@@ -46,27 +48,22 @@ class Logit:
         log_likelihood (float): value of the log-likelihood for the model.
         results (Statsmodels object): stores information from the Statsmodels
             Logit regression.
-        resid_model (pd.Series): residuals obtained from the fitted model.
-        resid_model_standardized (pd.Series): standardized residuals obtained
+        resid (pd.Series): residuals obtained from the fitted model.
+        resid_standardized (pd.Series): standardized residuals obtained
             from the fitted model.
-        y_model (pd.Series): contains the values of the independent variable
-            for the observations that were used to fit the model.  If an
-            observation is missing values from either X or y, then it will not
-            appear in this dataframe.
-        y_model_standardized (pd.Series): y_model in the form of standardized
+        y (pd.Series): contains the values of the independent variable
+            for the observations that were used to fit the model.
+        y_standardized (pd.Series): y in the form of standardized
             estimates.
-        X_model (pd.DataFrame): contains the values of the regressors for the
-            observations used to fit the model.  If an observation is missing
-            values from either X or y, then it will not appear in this
-            dataframe.
-        X_model_standardized (pd.DataFrame): X_model in the form of
+        X (pd.DataFrame): contains the values of the regressors for the
+            observations used to fit the model.
+        X_standardized (pd.DataFrame): X in the form of
             standardized estimates.
     Attributes (auxiliary - used to store arguments):
-        X
-        y
         alpha
     """
-    def __init__(self, df, y_list, regressors_list, alpha=0.05):
+
+    def __init__(self, df, y_list, regressors_list, alpha=0.05, printing=True):
         """Initializes the Logit model object."""
         # Model inputs (attributes from arguments):
         [y_name] = y_list  # sequence unpacking in order to make Series
@@ -79,7 +76,7 @@ class Logit:
         self._alpha = alpha
 
         # Fit model
-        self._regress()
+        self._regress(printing=printing)
         self._standardize_results()
 
     # MODEL INPUTS
@@ -95,22 +92,10 @@ class Logit:
         return self._X
 
     @property
-    def y_model(self):
-        """pd.Series: endogenous variable (only the values used in
-        the model)"""
-        return self._y_model
-
-    @property
-    def X_model(self):
-        """pd.DataFrame: exogenous variables (only the values used in
-        the model)"""
-        return self._X_model
-
-    @property
-    def X_model_standardized(self):
+    def X_standardized(self):
         """pd.DataFrame: exogenous variables standardized (only the values
         used in the model)"""
-        return self._X_model_standardized
+        return self._X_standardized
 
     @property
     def alpha(self):
@@ -177,8 +162,8 @@ class Logit:
         return self._results_output_standardized
 
     @property
-    def resid_model_standardized(self):
-        return self._resid_model_standardized
+    def resid_standardized(self):
+        return self._resid_standardized
 
     @property
     def model_selection_stats(self):
@@ -201,20 +186,17 @@ class Logit:
         """
         return self._log_likelihood
 
-    def _regress(self):
-        # Drop any rows with NaNs
-        X_notna = self._X.dropna(axis='index')
-        y_notna = self._y.dropna(axis='index')
-        indices = list(set(X_notna.index).intersection(set(y_notna.index)))
-        self._X_model = self._X.loc[indices]
-        self._y_model = self._y.loc[indices]
+    def _regress(self, printing=True):
+        _df_input_conditions(self._X, self._y)
 
-        model = sm.Logit(self._y_model, sm.add_constant(self._X_model))
+        model = sm.Logit(self._y, sm.add_constant(self._X))
 
-        print("Model fitting in progress...")
+        if printing:
+            print("Model fitting in progress...")
         with _SuppressPrints():  # hide Statsmodels printing
             self._results = model.fit()
-        print("Model fitted.")
+        if printing:
+            print("Model fitted.")
         self._results_output = self._results.summary(alpha=self._alpha)
 
         model_selection_dict = {"Log-likelihood": self._results.llf,
@@ -223,7 +205,8 @@ class Logit:
                                 "BIC": self._results.bic}
         self._model_selection_stats = model_selection_dict
         self._log_likelihood = self._results.llf
-        self._odds_ratios = pd.Series(np.exp(self._results.params.drop('const')),
+        self._odds_ratios = pd.Series(np.exp(self._results.params
+                                             .drop('const')),
                                       name='odds_ratios')
         pass
 
@@ -236,19 +219,19 @@ class Logit:
         - Fit model on standardized X and y
         - Gather relevant estimates in a Pandas DataFrame & set to attribute
         """
-        # Drop any rows with NaNs (requires X_model and y_model)
+        # Drop any rows with NaNs (requires X and y)
 
         # Standardization accounts for NaN values (via Pandas)
-        stdev_X = self._X_model.std(ddof=1)
-        self._X_model_standardized = (
-            self._X_model - self._X_model.mean()) / stdev_X
+        stdev_X = self._X.std(ddof=1)
+        self._X_standardized = (
+            self._X - self._X.mean()) / stdev_X
 
         # Model fitting
-        model_standardized = sm.Logit(self._y_model,
-                                      sm.add_constant(self._X_model_standardized))
+        model_standardized = sm.Logit(self._y,
+                                      sm.add_constant(self._X_standardized))
         results_obj = model_standardized.fit(disp=0)  # hide second output info
-        self._resid_model_standardized = pd.Series(self._results.resid_pearson,
-                                                   index=self._y_model.index)
+        self._resid_standardized = pd.Series(self._results.resid_pearson,
+                                             index=self._y.index)
 
         # Initialize dataframe (regressors in index only)
         output_indices = results_obj.params.drop('const').index
@@ -315,7 +298,7 @@ class Logit:
             np.ndarray: shape (# examples, ) with a prediction for
             each example.
         """
-        regressors_count = self._X_model.shape[1]
+        regressors_count = self._X.shape[1]
 
         if type(X_predict) != np.ndarray:
             X_predict = X_predict.to_numpy()
@@ -339,8 +322,8 @@ class Logit:
             # to a NaN prediction
             if within_sample and X_predict.ndim == 1:
                 # Series of truth for whether each val is in range
-                vals_in_range = ((self._X_model.min() <= X_predict)
-                                 & (X_predict <= self._X_model.max()))
+                vals_in_range = ((self._X.min() <= X_predict)
+                                 & (X_predict <= self._X.max()))
                 # Series of truth for whether each observation has
                 # all X vals in range
                 all_vals_in_range = vals_in_range.all(axis=0)
@@ -349,10 +332,12 @@ class Logit:
                 X_predict = np.insert(X_predict, 0, 1)
             else:
                 # Truth array `vals_in_range` shape (# examples, # regressors)
-                vals_in_range_min = np.less_equal(np.tile(self._X_model.min().T, (examples_to_predict, 1)),
+                vals_in_range_min = np.less_equal(np.tile(self._X.min().T,
+                                                          (examples_to_predict, 1)),
                                                   X_predict)
                 vals_in_range_max = np.greater_equal(X_predict,
-                                                     np.tile(self._X_model.min().T, (examples_to_predict, 1)))
+                                                     np.tile(self._X.min().T,
+                                                             (examples_to_predict, 1)))
                 vals_in_range = vals_in_range_min & vals_in_range_max
                 # Truth array - shape (# examples, )
                 # for whether each observation has all X vals in range
@@ -391,8 +376,8 @@ class Logit:
             raise ValueError(
                 "Ensure significance level is a float number in range (0, 0.1]")
 
-        regressor_pvalues = self._results.pvalues  # Pandas Series
-        regressor_pvalues.drop('const', inplace=True)
+        regressor_pvalues = (self._results.pvalues
+                             .drop('const'))  # Pandas Series
 
         # Find the integer indices of the significant regressors
         indices_significant = np.where(regressor_pvalues <= alpha)[0]
