@@ -1,5 +1,8 @@
 .. image:: https://badge.fury.io/py/appelpy.svg
-    :target: https://badge.fury.io/py/appelpy
+    :target: https://badge.fury.io/py/appelpy/
+
+.. image:: https://img.shields.io/pypi/pyversions/appelpy.svg
+    :target: https://pypi.org/project/appelpy/
 
 .. image:: https://img.shields.io/badge/License-BSD%203--Clause-blue.svg
     :target: https://github.com/mfarragher/appelpy/blob/master/LICENSE.txt
@@ -40,10 +43,10 @@ The key information is sitting in the ``model1`` object, but there is much more 
 1) The simple syntax of software such as Stata.  With the data loaded, a regression model summary can be returned by a one-line command:
 
     .. code-block:: stata
- 
-       regress api00 acs_k3 meals full
 
-  However with the simplicity comes a few disadvantages: it is not open-source software; the workflows are tricky with modern business problems; lacks the benefits of object-oriented programming.
+        regress api00 acs_k3 meals full
+
+However with the simplicity comes a few disadvantages: it is not open-source software; the workflows are tricky with modern business problems; lacks the benefits of object-oriented programming.
 
 2) Statsmodels is a powerful Python library that addresses some of those disadvantages, but with that power comes a considerable learning curve and clunkiness.  Here is the code for the same regression:::
 
@@ -51,7 +54,7 @@ The key information is sitting in the ``model1`` object, but there is much more 
         model1 = sm.OLS(df['api00'], sm.add_constant(df['acs_k3', 'meals', 'full'])).fit()
         results1 = model1.summary()  # returns summary results
 
-  It can get much more unwieldy than that.  The model results object is brilliant as it can be printed in different formats (plaintext, Latex, etc.)... but that is only the starting point.  How do I diagnose the regression model itself?  How do I get standardized estimates?  That's where it becomes more complicated.
+It can get much more unwieldy than that.  The model results object is brilliant as it can be printed in different formats (plaintext, Latex, etc.)... but that is only the starting point.  How do I diagnose the regression model itself?  How do I get standardized estimates?  That's where it becomes more complicated.
 
 **appelpy** simply wants to achieve a *sweet spot* between both approaches.
 
@@ -61,17 +64,19 @@ Installation ⏲️
 *****************
 ``pip install appelpy``
 
+Supported for Python 3.6 and higher versions.
 
 ******************
 Dependencies 🖇️
 ******************
 - pandas>=0.24
+- jinja2
 - scipy
-- numpy
-- statsmodels>=0.8
+- numpy>=1.16
+- statsmodels>=0.9
 - patsy
-- seaborn
-- matplotlib
+- seaborn>=0.9
+- matplotlib>=3
 
 
 *************

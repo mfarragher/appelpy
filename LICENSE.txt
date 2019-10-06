@@ -61,3 +61,8 @@ Seaborn
 Project code: https://github.com/mwaskom/seaborn/
 Copyright (c) 2012-2018, Michael L. Waskom
 Licence (BSD): https://github.com/mwaskom/seaborn/blob/master/LICENSE
+
+Jinja
+Project code: https://github.com/pallets/jinja
+Copyright (c) 2007, Pallets
+Licence (BSD): https://github.com/pallets/jinja/blob/master/LICENSE.rst

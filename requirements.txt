@@ -1,7 +1,8 @@
 pandas>=0.24
+jinja2
 scipy
-numpy
-statsmodels>=0.8
+numpy>=1.16
+statsmodels>=0.9
 patsy
-seaborn
-matplotlib
+seaborn>=0.9
+matplotlib>=3
