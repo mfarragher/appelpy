@@ -2,7 +2,7 @@ import pytest
 import pandas as pd
 import statsmodels.api as sm
 from pandas.util.testing import assert_series_equal
-from appelpy.diagnostics import BadApples, variance_inflation_factors
+from appelpy.diagnostics import variance_inflation_factors
 from appelpy.linear_model import OLS
 
 
@@ -26,5 +26,5 @@ def test_variance_inflation_factors(model_mtcars_initial):
                               'am': 4.648487,
                               'gear': 5.357452,
                               'carb': 7.908747}, name='VIF')
-    df_vif = variance_inflation_factors(model_mtcars_initial.X_model)
+    df_vif = variance_inflation_factors(model_mtcars_initial.X)
     assert_series_equal(df_vif['VIF'].round(6), expected_vif)

@@ -11,7 +11,8 @@ __all__ = ['BadApples',
            'plot_residuals_vs_predicted_values',
            'pp_plot', 'qq_plot',
            'variance_inflation_factors',
-           'heteroskedasticity_test']
+           'heteroskedasticity_test',
+           'partial_regression_plot']
 
 
 def plot_residuals_vs_fitted_values(residual_values, fitted_values,
@@ -156,6 +157,71 @@ def variance_inflation_factors(X, vif_threshold=10):
     return pd.concat([vif, tol, vif_thres], axis='columns')
 
 
+def partial_regression_plot(appelpy_model_object, df, regressor,
+                            annotate_results=False, ax=None):
+    """Also known as the added variable plot, the partial regression plot
+    shows the effect of adding another regressor (independent variable)
+    to a regression model.
+
+    Args:
+        appelpy_model_object: the object that contains the info about a model
+            fitted with Appelpy.  e.g. for OLS regression the object would
+            be of the type appelpy.linear_model.OLS.
+        df (pd.DataFrame): dataframe used as an input in the original model.
+        regressor (str): the 'added variable', present in df, to examine
+            in the partial regression plot.
+        annotate_results (Bool): Defaults to False.  Annotate the plot with
+            the coefficient (b) and t-value of the regressor from the 'full'
+            model that now includes the regressor. (optional)
+        ax (Axes object): Matplotlib Axes object (optional)
+
+    Returns:
+        Figure object
+    """
+
+    X_list = appelpy_model_object.X.columns.tolist()
+    y_list = [appelpy_model_object.y.name]
+
+    if ax is None:
+        ax = plt.gca()
+
+    if (regressor not in X_list and regressor in df.columns
+            and not df[regressor].isnull().any()):
+        model_ylist = (sm.OLS(df[y_list], sm.add_constant(df[X_list]))
+                       .fit(disp=0))
+        model_var = (sm.OLS(df[regressor], sm.add_constant(df[X_list]))
+                     .fit(disp=0))
+
+        if annotate_results:
+            model_full = (sm.OLS(model_ylist.resid,
+                                 sm.add_constant(df[X_list + [regressor]]))
+                          .fit(disp=0))
+
+        fig = sns.regplot(model_var.resid, model_ylist.resid,
+                          ci=None, truncate=True,
+                          line_kws={'color': 'red'})
+        ax.grid()
+        ax.set_ylabel('e({} | X)'.format(y_list[0]))
+        ax.set_xlabel('e({} | X)'.format(regressor))
+        if annotate_results:
+            ax.set_title(('Partial regression plot: {}\n(b={:.4f}, t={:.3f})'
+                          .format(regressor,
+                                  model_full.params.loc[regressor],
+                                  model_full.tvalues.loc[regressor])))
+        else:
+            ax.set_title('Partial regression plot: {}'.format(regressor))
+        return fig
+    elif (regressor not in X_list and regressor in df.columns
+          and df[regressor].isnull().any()):
+        raise ValueError("""Null values found in the column for the regressor.
+        Account for them before calling a partial regression plot.""")
+    elif regressor in X_list:
+        raise ValueError("""Function does not currently support use of a
+        regressor that is already in the model.""")
+    else:
+        raise ValueError("Regressor not found in the dataset.")
+
+
 class BadApples:
     """The BadApples class takes an appelpy model object and can provide
     diagnostics of extreme observations.  It calculates measures of
@@ -209,25 +275,26 @@ class BadApples:
         measures_outliers (pd.DataFrame): dataframe with residual measures,
             namely the standardized residuals (resid_standard) and
             Studentized residuals (resid_student).
-        indices_high_influence (list): list of indices of X_model (i.e.
+        indices_high_influence (list): list of indices of X (i.e.
             observations) that have high influence on at least one
             measure.
-        indices_high_leverage (list): list of indices of X_model (i.e.
+        indices_high_leverage (list): list of indices of X (i.e.
             observations) that have high leverage based on a heuristic.
-        indices_outliers (list): list of indices of X_model (i.e.
+        indices_outliers (list): list of indices of X (i.e.
             observations) that are viewed as outliers based on a heuristic.
 
     Attributes (auxiliary - used to store arguments or inputs):
         appelpy_model_object
-        y_model
-        X_model
+        y
+        X
 
     """
+
     def __init__(self, appelpy_model_object):
         # Inputs and model info
         self._appelpy_model_object = appelpy_model_object
-        self._y_model = appelpy_model_object.y_model
-        self._X_model = appelpy_model_object.X_model
+        self._y = appelpy_model_object.y
+        self._X = appelpy_model_object.X
         # Outputs
         self._measures_influence = None
         self._measures_leverage = None
@@ -243,10 +310,14 @@ class BadApples:
         print('Calculations saved to object.')
 
     @property
-    def X_model(self):
-        """pd.DataFrame: exogenous variables (only the values used in
-        the model)"""
-        return self._X_model
+    def y(self):
+        """pd.Series: endogenous / dependent variable"""
+        return self._y
+
+    @property
+    def X(self):
+        """pd.DataFrame: exogenous / independent variables"""
+        return self._X
 
     @property
     def measures_influence(self):
@@ -298,18 +369,19 @@ class BadApples:
                                              'student_resid']].copy()
         self._measures_outliers.columns = ['resid_standard',
                                            'resid_student']
-        self._measures_leverage = influence['hat_diag'].rename('leverage').copy()
+        self._measures_leverage = influence['hat_diag'].rename(
+            'leverage').copy()
         self._measures_influence = influence.drop(
             columns=['standard_resid', 'student_resid', 'hat_diag']).copy()
 
         pass
 
     def _calculate_heuristics(self):
-        if self._X_model.ndim == 1:
+        if self._X.ndim == 1:
             k = 1
-            n = len(self._X_model)
+            n = len(self._X)
         else:
-            n, k = self._X_model.shape
+            n, k = self._X.shape
         # Leverage points:
         self._indices_high_leverage = (self._measures_leverage[(self._measures_leverage >
                                                                 (2*k + 2) /
@@ -355,7 +427,7 @@ class BadApples:
         high leverage or are outliers, based on at least one heuristic.
 
         Returns:
-            pd.DataFrame: a subset of extreme observations from X_model.
+            pd.DataFrame: a subset of extreme observations from X.
         """
         extreme_indices_list = list(set().union(self._indices_high_leverage,
                                                 self._indices_outliers,
@@ -365,7 +437,7 @@ class BadApples:
             print('No extreme observations found.')
             return None
         else:
-            df = pd.concat([self._y_model, self._X_model], axis='columns')
+            df = pd.concat([self._y, self._X], axis='columns')
             return df[df.index.isin(extreme_indices_list)].copy()
 
     def _calculate_leverage_vs_residuals_squared(self, rescale=False):
@@ -490,7 +562,7 @@ def heteroskedasticity_test(test_name, appelpy_model_object,
                                    sm.add_constant(appelpy_model_object.X[regressors_subset])).fit()
             sq_resid = (reduced_model.resid ** 2).to_numpy()
         else:
-            sq_resid = (appelpy_model_object.resid_model ** 2).to_numpy()
+            sq_resid = (appelpy_model_object.resid ** 2).to_numpy()
 
         # Scale the residuals
         scaled_sq_resid = sq_resid / sq_resid.mean()
@@ -507,6 +579,6 @@ def heteroskedasticity_test(test_name, appelpy_model_object,
     if test_name == 'white':
         if regressors_subset:
             print("Ignoring regressors_subset.  White test will use original regressors.")
-        white_test = sms.het_white(appelpy_model_object.resid_model,
-                                   sm.add_constant(appelpy_model_object.X_model))
+        white_test = sms.het_white(appelpy_model_object.resid,
+                                   sm.add_constant(appelpy_model_object.X))
         return white_test[0], white_test[1]  # lm, pval
