@@ -36,7 +36,7 @@ def statistical_moments(df, kurtosis_fisher=True):
                             index=df_numeric.columns)
     for col in df_numeric.columns:
         df_stats.loc[col, 'mean'] = np.mean(df_numeric[col].dropna())
-        df_stats.loc[col, 'var'] = np.var(df_numeric[col].dropna())
+        df_stats.loc[col, 'var'] = np.var(df_numeric[col].dropna(), ddof=1)
         df_stats.loc[col, 'skew'] = sp.stats.skew(df_numeric[col].dropna())
         if kurtosis_fisher:
             df_stats.loc[col, 'kurtosis'] = sp.stats.kurtosis(
@@ -70,9 +70,10 @@ def correlation_heatmap(df, font_size=12, ax=None):
     mask[np.triu_indices_from(mask)] = True
 
     # Store heatmap from mask
-    fig = sns.heatmap(corr_matrix, mask=mask,
-                      cmap='RdBu_r', cbar_kws={"shrink": .6},
-                      annot=True, annot_kws={"size": font_size},
-                      vmax=1, vmin=-1, linewidths=.5,
-                      square=True, ax=ax)
+    heat_plot = sns.heatmap(corr_matrix, mask=mask,
+                            cmap='RdBu_r', cbar_kws={"shrink": .6},
+                            annot=True, annot_kws={"size": font_size},
+                            vmax=1, vmin=-1, linewidths=.5,
+                            square=True, ax=ax)
+    fig = heat_plot.figure
     return fig
