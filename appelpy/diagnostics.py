@@ -34,8 +34,9 @@ def plot_residuals_vs_fitted_values(residual_values, fitted_values,
 
     if ax is None:
         ax = plt.gca()
-    fig = sns.regplot(residual_values, fitted_values,
-                      ax=ax, fit_reg=False)
+    chart_plot = sns.regplot(residual_values, fitted_values,
+                             ax=ax, fit_reg=False)
+    fig = chart_plot.figure
     ax.grid(True, linewidth=0.5)
     ax.set_title("Residuals vs Fitted Values Plot")
     ax.set_xlabel("Fitted Values")
@@ -61,8 +62,9 @@ def plot_residuals_vs_predicted_values(residual_values, predicted_values,
     """
     if ax is None:
         ax = plt.gca()
-    fig = sns.regplot(residual_values, predicted_values,
-                      ax=ax, fit_reg=False)
+    chart_plot = sns.regplot(residual_values, predicted_values,
+                             ax=ax, fit_reg=False)
+    fig = chart_plot.figure
     ax.grid(True, linewidth=0.5)
     ax.set_title("Residuals vs Predicted Values Plot")
     ax.set_xlabel("Predicted Values")
@@ -197,9 +199,10 @@ def partial_regression_plot(appelpy_model_object, df, regressor,
                                  sm.add_constant(df[X_list + [regressor]]))
                           .fit(disp=0))
 
-        fig = sns.regplot(model_var.resid, model_ylist.resid,
-                          ci=None, truncate=True,
-                          line_kws={'color': 'red'})
+        chart_plot = sns.regplot(model_var.resid, model_ylist.resid,
+                                 ci=None, truncate=True,
+                                 line_kws={'color': 'red'})
+        fig = chart_plot.figure
         ax.grid()
         ax.set_ylabel('e({} | X)'.format(y_list[0]))
         ax.set_xlabel('e({} | X)'.format(regressor))
@@ -241,10 +244,10 @@ class BadApples:
     - leverage: value from hat matrix diagonal.  Extreme if
         val > (2*k + 2) / n
     OUTLIERS:
-    - resid_standard: standardized residual.  Extreme if
+    - resid_standardized: standardized residual.  Extreme if
         |val| > 2, i.e. approx. 5% of observations will be
         flagged.
-    - resid_student: studentized residual.  Extreme if
+    - resid_studentized: studentized residual.  Extreme if
         |val| > 2, i.e. approx. 5% of observations will be
         flagged.
 
@@ -273,8 +276,8 @@ class BadApples:
             observation.  These values are from the diagonal of the hat
             matrix.
         measures_outliers (pd.DataFrame): dataframe with residual measures,
-            namely the standardized residuals (resid_standard) and
-            Studentized residuals (resid_student).
+            namely the standardized residuals (resid_standardized) and
+            Studentized residuals (resid_studentized).
         indices_high_influence (list): list of indices of X (i.e.
             observations) that have high influence on at least one
             measure.
@@ -367,8 +370,8 @@ class BadApples:
         # Decomposition of Statsmodels influence object
         self._measures_outliers = influence[['standard_resid',
                                              'student_resid']].copy()
-        self._measures_outliers.columns = ['resid_standard',
-                                           'resid_student']
+        self._measures_outliers.columns = ['resid_standardized',
+                                           'resid_studentized']
         self._measures_leverage = influence['hat_diag'].rename(
             'leverage').copy()
         self._measures_influence = influence.drop(
@@ -433,12 +436,8 @@ class BadApples:
                                                 self._indices_outliers,
                                                 self._indices_high_influence))
 
-        if len(extreme_indices_list) == 0:
-            print('No extreme observations found.')
-            return None
-        else:
-            df = pd.concat([self._y, self._X], axis='columns')
-            return df[df.index.isin(extreme_indices_list)].copy()
+        df = pd.concat([self._y, self._X], axis='columns')
+        return df[df.index.isin(extreme_indices_list)].copy()
 
     def _calculate_leverage_vs_residuals_squared(self, rescale=False):
         df = pd.DataFrame(index=self._measures_leverage.index,
@@ -446,11 +445,11 @@ class BadApples:
         df['leverage'] = self._measures_leverage
 
         if rescale:
-            df['resid_score'] = pd.Series((self._measures_outliers['resid_standard'] ** 2 /
+            df['resid_score'] = pd.Series((self._measures_outliers['resid_standardized'] ** 2 /
                                            len(self._measures_outliers)),
                                           index=self._measures_outliers.index)
         else:
-            df['resid_score'] = pd.Series(self._measures_outliers['resid_standard'] ** 2,
+            df['resid_score'] = pd.Series(self._measures_outliers['resid_standardized'] ** 2,
                                           index=self._measures_outliers.index)
 
         return df
@@ -492,14 +491,14 @@ class BadApples:
             rescale=rescale)
         if rescale:
             resid_mean = plot_df['resid_score'].mean()
-            fig = plt.scatter(plot_df['resid_score'],
-                              self._measures_leverage.values)
+            path_c = plt.scatter(plot_df['resid_score'],
+                                 self._measures_leverage.values)
             ax.set_xlabel(
                 r"Normalized $resid^{2}$ / total observations")
         else:
             resid_mean = plot_df['resid_score'].mean()
-            fig = plt.scatter(plot_df['resid_score'],
-                              self._measures_leverage.values)
+            path_c = plt.scatter(plot_df['resid_score'],
+                                 self._measures_leverage.values)
             ax.set_xlabel(r"Normalized $resid^{2}$")
         ax.set_ylabel("Leverage")
         ax.axvline(resid_mean, linestyle='--', color='gray')
@@ -520,6 +519,8 @@ class BadApples:
                             xytext=(3, 3),
                             textcoords='offset points')
 
+        fig = path_c.figure
+
         return fig
 
 
@@ -529,10 +530,13 @@ def heteroskedasticity_test(test_name, appelpy_model_object,
 
     Supported tests:
     - 'breusch_pagan': equivalent to Stata's `hettest` command.
+    - 'breusch_pagan_studentized': equivalent to default behaviour of the
+        bptest command in R.
     - 'white': equivalent to Stata's `imtest, white` command.
 
     Args:
-        test_name (str): either 'breusch_pagan' or 'white'.
+        test_name (str): either 'breusch_pagan', 'breusch_pagan_studentized'
+            or 'white'.
         appelpy_model_object: the object that contains the info about a model
             fitted with Appelpy.  e.g. for OLS regression the object would
             be of the type appelpy.linear_model.OLS.
@@ -541,16 +545,19 @@ def heteroskedasticity_test(test_name, appelpy_model_object,
             None.
 
     Raises:
-        ValueError: Choose one of 'breusch_pagan' or 'white' as a test name.
+        ValueError: Choose one of 'breusch_pagan', 'breusch_pagan_studentized'
+            or 'white' as a test name.
         ValueError: Check the regressors_subset items were used in the model.
 
     Returns:
         test_statistic, p_value: the test statistic and the corresponding
             p-value.
     """
-    if test_name not in ['breusch_pagan', 'white']:
+    if test_name not in ['breusch_pagan', 'breusch_pagan_studentized',
+                         'white']:
         raise ValueError(
-            "Choose one of 'breusch_pagan' or 'white' as a test name.")
+            """Choose one of 'breusch_pagan', 'breusch_pagan_studentized' or
+            'white' as a test name.""")
 
     if test_name == 'breusch_pagan':
         # Get residuals (from model object or run again on a regressors subset)
@@ -559,8 +566,9 @@ def heteroskedasticity_test(test_name, appelpy_model_object,
                 raise ValueError(
                     'Regressor(s) not recognised in dataset.  Check the list given to the function.')
             reduced_model = sm.OLS(appelpy_model_object.y,
-                                   sm.add_constant(appelpy_model_object.X[regressors_subset])).fit()
-            sq_resid = (reduced_model.resid ** 2).to_numpy()
+                                   sm.add_constant(appelpy_model_object.X[regressors_subset]))
+            reduced_model_results = reduced_model.fit()
+            sq_resid = (reduced_model_results.resid ** 2).to_numpy()
         else:
             sq_resid = (appelpy_model_object.resid ** 2).to_numpy()
 
@@ -575,6 +583,22 @@ def heteroskedasticity_test(test_name, appelpy_model_object,
         lm = aux_model.ess / 2
         pval = sp.stats.chi2.sf(lm, 1)  # dof=1
         return lm, pval
+
+    if test_name == 'breusch_pagan_studentized':
+        if regressors_subset:
+            if not set(regressors_subset).issubset(set(appelpy_model_object.X.columns)):
+                raise ValueError(
+                    'Regressor(s) not recognised in dataset.  Check the list given to the function.')
+            reduced_model = sm.OLS(appelpy_model_object.y,
+                                   sm.add_constant(appelpy_model_object.X[regressors_subset]))
+            reduced_model_results = reduced_model.fit()
+            lm, pval, _, _ = sms.het_breuschpagan(reduced_model_results.resid,
+                                                  reduced_model_results.model.exog)
+            return lm, pval
+        else:
+            lm, pval, _, _ = sms.het_breuschpagan(appelpy_model_object.results.resid,
+                                                  appelpy_model_object.results.model.exog)
+            return lm, pval
 
     if test_name == 'white':
         if regressors_subset:
