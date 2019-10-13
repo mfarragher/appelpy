@@ -92,11 +92,14 @@ class WLS:
         self._y = df[y_name]  # Pandas Series
         if len(regressors_list) == 1:
             [x_name] = regressors_list
-            self._X = df[x_name]  # Pandas Series
+            self._X = df[x_name].to_frame()  # Pandas dataframe
         else:
             self._X = df[regressors_list]  # Pandas dataframe
         self._cov_type = cov_type
-        self._w = w
+        if w is None:
+            self._w = pd.Series(np.ones(len(self._X)))
+        else:
+            self._w = w
         self._alpha = alpha
 
         # Fit model
@@ -217,10 +220,6 @@ class WLS:
         return self._resid
 
     @property
-    def resid_standardized(self):
-        return self._resid_standardized
-
-    @property
     def model_selection_stats(self):
         """dict: model selection stats (keys) and their values from the model.
 
@@ -276,8 +275,6 @@ class WLS:
         model_standardized = sm.WLS(yw_mean_se, sm.add_constant(Xw_mean_se),
                                     weights=self._w)
         results_obj = model_standardized.fit(cov_type=self._cov_type)
-        self._resid_standardized = pd.Series(self._results.resid_pearson,
-                                             index=self._resid.index)
 
         # Initialize dataframe (regressors in index only)
         output_indices = results_obj.params.drop('const').index
@@ -555,6 +552,7 @@ class OLS(WLS):
     Attributes (auxiliary - used to store arguments):
         cov_type
         alpha
+        w
     """
 
     def __init__(self, df, y_list, regressors_list,
@@ -565,9 +563,10 @@ class OLS(WLS):
         self._y = df[y_name]  # Pandas Series
         if len(regressors_list) == 1:
             [x_name] = regressors_list
-            self._X = df[x_name]  # Pandas Series
+            self._X = df[x_name].to_frame()  # Pandas dataframe
         else:
             self._X = df[regressors_list]  # Pandas dataframe
+        self._w = pd.Series(np.ones(len(self._X)))
         self._cov_type = cov_type
         self._alpha = alpha
 
@@ -578,7 +577,12 @@ class OLS(WLS):
     @property
     def w(self):
         """pd.Series: weight for each observation"""
-        raise AttributeError("No weights are explicitly set in OLS model.")
+        return self._w
+
+    @property
+    def resid_standardized(self):
+        """pd.Series: standardized residuals obtained from the fitted model."""
+        return self._resid_standardized
 
     def _regress(self, printing=True):
         _df_input_conditions(self._X, self._y)
@@ -623,8 +627,10 @@ class OLS(WLS):
         model_standardized = sm.OLS(self._y_standardized,
                                     sm.add_constant(self._X_standardized))
         results_obj = model_standardized.fit(cov_type=self._cov_type)
-        self._resid_standardized = pd.Series(self._results.resid_pearson,
-                                             index=self._resid.index)
+        self._resid_standardized = pd.Series((self._results.get_influence()
+                                              .resid_studentized_internal),
+                                             index=self._resid.index,
+                                             name='resid_standardized')
 
         # Initialize dataframe (regressors in index only)
         output_indices = results_obj.params.drop('const').index

@@ -49,8 +49,6 @@ class Logit:
         results (Statsmodels object): stores information from the Statsmodels
             Logit regression.
         resid (pd.Series): residuals obtained from the fitted model.
-        resid_standardized (pd.Series): standardized residuals obtained
-            from the fitted model.
         y (pd.Series): contains the values of the independent variable
             for the observations that were used to fit the model.
         y_standardized (pd.Series): y in the form of standardized
@@ -162,10 +160,6 @@ class Logit:
         return self._results_output_standardized
 
     @property
-    def resid_standardized(self):
-        return self._resid_standardized
-
-    @property
     def model_selection_stats(self):
         """dict: model selection stats (keys) and their values from the model.
 
@@ -230,8 +224,6 @@ class Logit:
         model_standardized = sm.Logit(self._y,
                                       sm.add_constant(self._X_standardized))
         results_obj = model_standardized.fit(disp=0)  # hide second output info
-        self._resid_standardized = pd.Series(self._results.resid_pearson,
-                                             index=self._y.index)
 
         # Initialize dataframe (regressors in index only)
         output_indices = results_obj.params.drop('const').index
