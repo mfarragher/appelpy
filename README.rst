@@ -7,6 +7,12 @@
 .. image:: https://img.shields.io/badge/License-BSD%203--Clause-blue.svg
     :target: https://github.com/mfarragher/appelpy/blob/master/LICENSE.txt
 
+.. image:: https://pepy.tech/badge/appelpy
+    :target: https://pepy.tech/project/appelpy/
+
+.. image:: https://codecov.io/gh/mfarragher/appelpy/branch/master/graph/badge.svg
+    :target: https://codecov.io/gh/mfarragher/appelpy
+
 ===================================================
 appelpy: Applied Econometrics Library for Python
 ===================================================
@@ -42,7 +48,7 @@ The key information is sitting in the ``model1`` object, but there is much more 
 ====================
 1) The simple syntax of software such as Stata.  With the data loaded, a regression model summary can be returned by a one-line command:
 
-    .. code-block:: stata
+    .. code-block::
 
         regress api00 acs_k3 meals full
 
