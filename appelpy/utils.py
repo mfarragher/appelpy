@@ -21,45 +21,24 @@ class _SuppressPrints:
 
 
 def _df_input_conditions(X, y):
-    if isinstance(X, pd.Series):
-        if (y.isin([np.inf, -np.inf]).any() or
-                X.isin([np.inf, -np.inf]).any()):
-            raise ValueError(
-                '''Remove infinite (positive or negative) values from the
-                dataset before modelling.''')
-    else:
-        if (y.isin([np.inf, -np.inf]).any() or
-                len(X[X.isin([np.inf, -np.inf]).any(1)]) > 0):
-            raise ValueError(
-                '''Remove infinite (positive or negative) values from the
-                dataset before modelling.''')
+    if (y.isin([np.inf, -np.inf]).any() or
+            len(X[X.isin([np.inf, -np.inf]).any(1)]) > 0):
+        raise ValueError(
+            '''Remove infinite (positive or negative) values from the
+            dataset before modelling.''')
 
-    if isinstance(X, pd.Series):
-        if (pd.api.types.is_categorical_dtype(X.dtype) or
-                pd.api.types.is_categorical_dtype(y.dtype)):
-            raise TypeError(
-                '''Encode dummies from Pandas Category column(s) before
-                modelling.''')
-    else:
-        if (len(X.select_dtypes(['category']).columns.tolist()) > 0
-            or
-                pd.api.types.is_categorical_dtype(y.dtype)):
-            raise TypeError(
-                '''Encode dummies from Pandas Category column(s) before
-                modelling.''')
+    if (len(X.select_dtypes(['category']).columns.tolist()) > 0
+        or
+            pd.api.types.is_categorical_dtype(y.dtype)):
+        raise TypeError(
+            '''Encode dummies from Pandas Category column(s) before
+            modelling.''')
 
-    if isinstance(X, pd.Series):
-        if (pd.api.types.is_string_dtype(X.dtype) or
-                pd.api.types.is_string_dtype(y.dtype)):
-            raise TypeError(
-                '''Remove columns with string data before modelling.  If
-                categorical data, then use their dummy columns in model.''')
-    else:
-        if (len(X.select_dtypes(['O']).columns.tolist()) > 0 or
-                pd.api.types.is_string_dtype(y.dtype)):
-            raise TypeError(
-                '''Remove columns with string data before modelling.  If
-                categorical data, then use their dummy columns in model.''')
+    if (len(X.select_dtypes(['O']).columns.tolist()) > 0 or
+            pd.api.types.is_string_dtype(y.dtype)):
+        raise TypeError(
+            '''Remove columns with string data before modelling.  If
+            categorical data, then use their dummy columns in model.''')
 
     if y.isnull().values.any() or X.isnull().values.any():
         raise ValueError(
@@ -192,9 +171,9 @@ class DummyEncoder:
             # Determine the base level
             base_level = category_base_dict[col]
             if category_base_dict[col] == min:
-                base_level = min(self._df[col].unique().dropna())
+                base_level = min(self._df[col].dropna().unique())
             if category_base_dict[col] == max:
-                base_level = max(self._df[col].unique().dropna())
+                base_level = max(self._df[col].dropna().unique())
             self._categorical_col_base_levels[col] = base_level
 
             # GENERATE DUMMIES GIVEN THE nan_policy
@@ -204,7 +183,7 @@ class DummyEncoder:
             if nan_policy == 'dummy_for_nan':
                 # If there are no NaN category values then do not create
                 # a NaN dummy:
-                if np.count_nonzero((~np.isnan(self._df[col].to_numpy()))
+                if np.count_nonzero((~pd.isna(self._df[col].to_numpy()))
                                     == len(self._df[col].to_numpy())):
                     dummy_cols = pd.get_dummies(
                         self._df[col], prefix=col, prefix_sep=self._separator)
@@ -498,16 +477,19 @@ class InteractionEncoder:
                             str(col) for col in (col_name, col_other_value))
                         interaction_dummies_df[interaction_term] = (col_other_dummies[col_other_value]
                                                                     * self._df[col_name])
-                    # Remove original non-categorical cols and replace with dummies:
+                    # Remove original non-categorical cols and replace with
+                    # dummies:
                     dummy_encoder = DummyEncoder(processed_df,
                                                  separator=self._separator)
                     processed_df = dummy_encoder.encode({col_other: None})
                     # Add interaction cols:
-                    processed_df = pd.concat([processed_df, interaction_dummies_df],
+                    processed_df = pd.concat([processed_df,
+                                              interaction_dummies_df],
                                              axis='columns')
                     continue
 
-        # Collect columns added to the final dataframe and removed from original dataframe:
+        # Collect columns added to the final dataframe and removed from
+        # original dataframe:
         self._columns_removed = list((set(self._df.columns)
                                       - set(processed_df.columns)))
         self._columns_added = list((set(processed_df.columns)
