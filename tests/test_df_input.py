@@ -17,21 +17,44 @@ def df_cars93(scope='module'):
 
 def test_nan_values(df_cars93):
     df = df_cars93.copy()
+
+    # x var
     df.loc[0, 'mpg_city'] = np.NaN
+    with pytest.raises(ValueError, match=r'.*NaN*.'):
+        OLS(df, ['price'], ['mpg_city'])
+
+    # y var
+    df = df_cars93.copy()
+    df.loc[0, 'price'] = np.NaN
     with pytest.raises(ValueError, match=r'.*NaN*.'):
         OLS(df, ['price'], ['mpg_city'])
 
 
 def test_inf_values(df_cars93):
     df = df_cars93.copy()
+
+    # x var
     df.loc[0, 'mpg_city'] = np.inf
+    with pytest.raises(ValueError, match=r'.*infinite*.'):
+        OLS(df, ['price'], ['mpg_city'])
+
+    # y var
+    df = df_cars93.copy()
+    df.loc[0, 'price'] = -np.inf
     with pytest.raises(ValueError, match=r'.*infinite*.'):
         OLS(df, ['price'], ['mpg_city'])
 
 
 def test_string_values(df_cars93):
+    # x var
     with pytest.raises(TypeError, match=r'.*string*.'):
         OLS(df_cars93, ['price'], ['type'])
+
+    # y var
+    df = df_cars93.copy()
+    df.loc[0, 'price'] = 'bad_idea'
+    with pytest.raises(TypeError, match=r'.*string*.'):
+        OLS(df, ['price'], ['mpg_city'])
 
 
 def test_category_values(df_cars93):
