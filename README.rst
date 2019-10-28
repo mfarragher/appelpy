@@ -28,13 +28,16 @@ The library builds upon the functionality of the 'vanilla' Python data stack (e.
 
 See the `appelpy-examples <https://github.com/mfarragher/appelpy-examples>`_ Github repo for more detailed **documentation and notebooks** that show the functionality of the library.
 
+In particular see the `10 Minutes to Appelpy <https://github.com/mfarragher/appelpy-examples/blob/master/00_ten-minutes-to-appelpy.ipynb>`_ notebook for a whirlwind tour of the library's functionality on the California Test Score (Caschool) dataset.
 
 🥧 Why it's as easy as pie
 ==========================
-Here is a flavour of a basic OLS regression done through appelpy, supposing you have `data <https://econpapers.repec.org/paper/bocbocins/caschool.htm>`_ sitting in a Pandas dataframe ``df`` and want to model the dependent variable ``api00`` on three other variables:::
+Here is a flavour of a basic OLS regression done through appelpy, supposing you have `data <https://econpapers.repec.org/paper/bocbocins/caschool.htm>`_ sitting in a Pandas dataframe ``df`` and want to model the dependent variable ``api00`` on three other variables:
+
+    .. code-block:: python
 
         from appelpy.linear_model import OLS
-        model1 = OLS(df, ['api00'], ['acs_k3', 'meals', 'full'])
+        model1 = OLS(df, ['api00'], ['acs_k3', 'meals', 'full']).fit()
         model1.results_output  # returns summary results
 
 The key information is sitting in the ``model1`` object, but there is much more functionality that can be done with it.  These are more things that can be done via one line of code:
@@ -46,15 +49,15 @@ The key information is sitting in the ``model1`` object, but there is much more 
 
 🍏 What inspired it?
 ====================
-1) The simple syntax of software such as Stata.  With the data loaded, a regression model summary can be returned by a one-line command:
-
-    .. code-block::
+1) The simple syntax of software such as Stata.  With the data loaded, a regression model summary can be returned by a one-line command:::
 
         regress api00 acs_k3 meals full
 
-However with the simplicity comes a few disadvantages: it is not open-source software; the workflows are tricky with modern business problems; lacks the benefits of object-oriented programming.
+However with the simplicity comes a few disadvantages: Stata is not open-source software; the workflows are tricky with modern business problems; lacks the benefits of object-oriented programming.
 
-2) Statsmodels is a powerful Python library that addresses some of those disadvantages, but with that power comes a considerable learning curve and clunkiness.  Here is the code for the same regression:::
+2) Statsmodels is a powerful Python library that addresses some of those disadvantages, but with that power comes a considerable learning curve and clunkiness.  Here is the code for the same regression:
+
+    .. code-block:: python
 
         import statsmodels.api as sm
         model1 = sm.OLS(df['api00'], sm.add_constant(df['acs_k3', 'meals', 'full'])).fit()
@@ -62,8 +65,7 @@ However with the simplicity comes a few disadvantages: it is not open-source sof
 
 It can get much more unwieldy than that.  The model results object is brilliant as it can be printed in different formats (plaintext, Latex, etc.)... but that is only the starting point.  How do I diagnose the regression model itself?  How do I get standardized estimates?  That's where it becomes more complicated.
 
-**appelpy** simply wants to achieve a *sweet spot* between both approaches.
-
+**appelpy** simply aims to achieve a *sweet spot* between both approaches.
 
 *****************
 Installation ⏲️
