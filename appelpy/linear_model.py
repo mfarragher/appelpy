@@ -13,12 +13,13 @@ __all__ = ['WLS', 'OLS']
 class WLS:
     """Weighted Least Squares (WLS) model.
 
-    Regression pipeline performed when setting up the model:
-        - Drop any rows with NaNs before modelling
-        - Fit model and gather estimates to store in attributes
-        - Standardization of X and y
-        - Fit model on standardized X and y and store estimates in
-            attributes.
+    Regression pipeline:
+        - Initialise model object (specify source dataframe and X & y
+            columns)
+        - Fit model:
+            - Run model and store estimates as model object attributes
+            - Run model on standardized X and y and store estimates in
+                attributes.
 
     Args:
         df (pd.DataFrame): Pandas DataFrame that contains the data to use
@@ -44,10 +45,9 @@ class WLS:
                 observations < 250.
         alpha (float, optional): Defaults to 0.05.  The significance level
             used for reporting confidence intervals in the model summary.
-        printing (Bool, optional): display print statements for function calls.
-            Defaults to True.
 
     Methods:
+        fit: fit the model and store the results in the model object.
         diagnostic_plot: create a plot for regression diagnostics,
             e.g. P-P plot, Q-Q plot, residuals vs predicted values plot,
             residuals vs fitted values plot.
@@ -78,6 +78,8 @@ class WLS:
             observations used to fit the model.
         X_standardized (pd.DataFrame): X in the form of
             standardized estimates.
+        is_fitted (Boolean): indicator for whether the model has been fitted.
+
     Attributes (auxiliary - used to store arguments):
         cov_type
         w
@@ -85,7 +87,7 @@ class WLS:
     """
 
     def __init__(self, df, y_list, regressors_list, w=None,
-                 cov_type='nonrobust', alpha=0.05, printing=True):
+                 cov_type='nonrobust', alpha=0.05):
         """Initializes the WLS model object."""
         # Model inputs (attributes from arguments):
         [y_name] = y_list  # sequence unpacking in order to make Series
@@ -101,10 +103,7 @@ class WLS:
         else:
             self._w = w
         self._alpha = alpha
-
-        # Fit model
-        self._regress(printing=printing)
-        self._standardize_results()
+        self._is_fitted = True
 
     # MODEL INPUTS
     # These should be immutable
@@ -220,6 +219,11 @@ class WLS:
         return self._resid
 
     @property
+    def resid_standardized(self):
+        """pd.Series: standardized residuals obtained from the fitted model."""
+        return self._resid_standardized
+
+    @property
     def model_selection_stats(self):
         """dict: model selection stats (keys) and their values from the model.
 
@@ -228,7 +232,32 @@ class WLS:
         """
         return self._model_selection_stats
 
-    def _regress(self, printing=True):
+    @property
+    def is_fitted(self):
+        "Boolean: indicator for whether the model has been fitted."
+        return self._is_fitted
+
+    def fit(self, printing=False):
+        """Fit the model and save the results in the model object.
+
+        Ensure the model dataset does not contain NaN values, inf
+        values, categorical or string data.
+
+        Args:
+            printing (bool, optional): display print statements to show
+                progress of function calls (e.g. 'Model fitted'). Defaults
+                to False.
+
+        Raises:
+            ValueError: remove +/- inf values from the model dataset.
+            TypeError: encode categorical columns as dummies before fitting
+                model.
+            ValueError: remove NaN values from the model dataset.
+
+        Returns:
+            Instance of the WLS model object, with the model estimates
+            now stored as attributes.
+        """
         _df_input_conditions(self._X, self._y)
 
         model = sm.WLS(self._y, sm.add_constant(self._X),
@@ -237,8 +266,6 @@ class WLS:
         if printing:
             print("Model fitting in progress...")
         self._results = model.fit(cov_type=self._cov_type)
-        if printing:
-            print("Model fitted.")
         self._results_output = self._results.summary(alpha=self._alpha)
         self._resid = self._results.resid
 
@@ -248,7 +275,14 @@ class WLS:
                                 "AIC": self._results.aic,
                                 "BIC": self._results.bic}
         self._model_selection_stats = model_selection_dict
-        pass
+
+        self._standardize_results()
+
+        self._is_fitted = True
+        if printing:
+            print("Model fitted.")
+
+        return self
 
     def _standardize_results(self):
         """Take the unstandardized model and make its results standardized.
@@ -259,8 +293,6 @@ class WLS:
         - Fit model on standardized X and y
         - Gather relevant estimates in a Pandas DataFrame & set to attribute
         """
-        # Drop any rows with NaNs (requires X and y)
-
         # Standardization accounts for NaN values (via Pandas)
         w_stats_tuple = self._get_weighted_stats(self._X, self._y,
                                                  self._w)
@@ -280,9 +312,9 @@ class WLS:
         output_indices = results_obj.params.drop('const').index
         output_cols = ['coef', 't', 'P>|t|',
                        'coef_stdX', 'coef_stdXy', 'stdev_X']
-        std_results_output = pd.DataFrame(index=output_indices,
-                                          columns=output_cols)
-        std_results_output = std_results_output.rename_axis(self._y.name)
+        std_results_output = (pd.DataFrame(index=output_indices,
+                                           columns=output_cols)
+                              .rename_axis(self._y.name))
 
         # Gather values from model that took the raw data
         std_results_output['coef'] = self._results.params
@@ -351,6 +383,9 @@ class WLS:
             np.ndarray: shape (# examples, ) with a prediction for
             each example.
         """
+        if not self._is_fitted:
+            raise ValueError("Ensure model is fitted first.")
+
         regressors_count = self._X.shape[1]
 
         if type(X_predict) != np.ndarray:
@@ -419,6 +454,9 @@ class WLS:
             list: a list of the significant regressor names, if any.
                 If no regressors are significant, then None is returned.
         """
+        if not self._is_fitted:
+            raise ValueError("Ensure model is fitted first.")
+
         if type(alpha) is not float:
             raise TypeError(
                 "Ensure that alpha is a float number in range (0, 0.1]")
@@ -461,6 +499,8 @@ class WLS:
         Returns:
             Figure: the plot as a Matplotlib Figure object.
         """
+        if not self._is_fitted:
+            raise ValueError("Ensure model is fitted first.")
 
         if plot_name not in ['pp_plot', 'qq_plot', 'rvf_plot', 'rvp_plot']:
             raise ValueError(
@@ -485,12 +525,13 @@ class WLS:
 class OLS(WLS):
     """Ordinary Least Squares (OLS) model.
 
-    Regression pipeline performed when setting up the model:
-        - Drop any rows with NaNs before modelling
-        - Fit model and gather estimates to store in attributes
-        - Standardization of X and y
-        - Fit model on standardized X and y and store estimates in
-            attributes.
+    Regression pipeline:
+        - Initialise model object (specify source dataframe and X & y
+            columns)
+        - Fit model:
+            - Run model and store estimates as model object attributes
+            - Run model on standardized X and y and store estimates in
+                attributes.
 
     Args:
         df (pd.DataFrame): Pandas DataFrame that contains the data to use
@@ -515,10 +556,9 @@ class OLS(WLS):
                 observations < 250.
         alpha (float, optional): Defaults to 0.05.  The significance level
             used for reporting confidence intervals in the model summary.
-        printing (Bool, optional): display print statements for function calls.
-            Defaults to True.
 
     Methods:
+        fit: fit the model and store the results in the model object.
         diagnostic_plot: create a plot for regression diagnostics,
             e.g. P-P plot, Q-Q plot, residuals vs predicted values plot,
             residuals vs fitted values plot.
@@ -549,6 +589,7 @@ class OLS(WLS):
             observations used to fit the model.
         X_standardized (pd.DataFrame): X in the form of
             standardized estimates.
+        is_fitted (Boolean): indicator for whether the model has been fitted.
     Attributes (auxiliary - used to store arguments):
         cov_type
         alpha
@@ -556,7 +597,7 @@ class OLS(WLS):
     """
 
     def __init__(self, df, y_list, regressors_list,
-                 cov_type='nonrobust', alpha=0.05, printing=True):
+                 cov_type='nonrobust', alpha=0.05):
         """Initializes the OLS model object."""
         # Model inputs (attributes from arguments):
         [y_name] = y_list  # sequence unpacking in order to make Series
@@ -569,22 +610,29 @@ class OLS(WLS):
         self._w = pd.Series(np.ones(len(self._X)))
         self._cov_type = cov_type
         self._alpha = alpha
+        self._is_fitted = False
 
-        # Fit model
-        self._regress(printing=printing)
-        self._standardize_results()
+    def fit(self, printing=False):
+        """Fit the model and save the results in the model object.
 
-    @property
-    def w(self):
-        """pd.Series: weight for each observation"""
-        return self._w
+        Ensure the model dataset does not contain NaN values, inf
+        values, categorical or string data.
 
-    @property
-    def resid_standardized(self):
-        """pd.Series: standardized residuals obtained from the fitted model."""
-        return self._resid_standardized
+        Args:
+            printing (bool, optional): display print statements to show
+                progress of function calls (e.g. 'Model fitted'). Defaults
+                to False.
 
-    def _regress(self, printing=True):
+        Raises:
+            ValueError: remove +/- inf values from the model dataset.
+            TypeError: encode categorical columns as dummies before fitting
+                model.
+            ValueError: remove NaN values from the model dataset.
+
+        Returns:
+            Instance of the OLS model object, with the model estimates
+            now stored as attributes.
+        """
         _df_input_conditions(self._X, self._y)
 
         model = sm.OLS(self._y, sm.add_constant(self._X))
@@ -592,8 +640,6 @@ class OLS(WLS):
         if printing:
             print("Model fitting in progress...")
         self._results = model.fit(cov_type=self._cov_type)
-        if printing:
-            print("Model fitted.")
         self._results_output = self._results.summary(alpha=self._alpha)
         self._resid = self._results.resid
 
@@ -603,7 +649,14 @@ class OLS(WLS):
                                 "AIC": self._results.aic,
                                 "BIC": self._results.bic}
         self._model_selection_stats = model_selection_dict
-        pass
+
+        self._standardize_results()
+
+        self._is_fitted = True
+        if printing:
+            print("Model fitted.")
+
+        return self
 
     def _standardize_results(self):
         """Take the unstandardized model and make its results standardized.
@@ -614,8 +667,6 @@ class OLS(WLS):
         - Fit model on standardized X and y
         - Gather relevant estimates in a Pandas DataFrame & set to attribute
         """
-        # Drop any rows with NaNs (requires X and y)
-
         # Standardization accounts for NaN values (via Pandas)
         stdev_X, stdev_y = self._X.std(ddof=1), self._y.std(ddof=1)
         self._X_standardized = (
@@ -636,9 +687,9 @@ class OLS(WLS):
         output_indices = results_obj.params.drop('const').index
         output_cols = ['coef', 't', 'P>|t|',
                        'coef_stdX', 'coef_stdXy', 'stdev_X']
-        std_results_output = pd.DataFrame(index=output_indices,
-                                          columns=output_cols)
-        std_results_output = std_results_output.rename_axis(self._y.name)
+        std_results_output = (pd.DataFrame(index=output_indices,
+                                           columns=output_cols)
+                              .rename_axis(self._y.name))
 
         # Gather values from model that took the raw data
         std_results_output['coef'] = self._results.params

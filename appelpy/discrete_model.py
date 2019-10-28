@@ -9,12 +9,13 @@ __all__ = ['Logit']
 class Logit:
     """Logistic regression model.
 
-    Regression pipeline performed when setting up the model:
-        - Drop any rows with NaNs before modelling
-        - Fit model and gather estimates to store in attributes
-        - Standardization of X and y
-        - Fit model on standardized X and y and store estimates in
-            attributes.
+    Regression pipeline:
+        - Initialise model object (specify source dataframe and X & y
+            columns)
+        - Fit model:
+            - Run model and store estimates as model object attributes
+            - Run model on standardized X and y and store estimates in
+                attributes.
 
     Args:
         df (pd.DataFrame): Pandas DataFrame that contains the data to use
@@ -57,6 +58,8 @@ class Logit:
             observations used to fit the model.
         X_standardized (pd.DataFrame): X in the form of
             standardized estimates.
+        is_fitted (Boolean): indicator for whether the model has been fitted.
+
     Attributes (auxiliary - used to store arguments):
         alpha
     """
@@ -72,10 +75,7 @@ class Logit:
         else:
             self._X = df[regressors_list]  # Pandas dataframe
         self._alpha = alpha
-
-        # Fit model
-        self._regress(printing=printing)
-        self._standardize_results()
+        self._is_fitted = False
 
     # MODEL INPUTS
     # These should be immutable
@@ -180,7 +180,32 @@ class Logit:
         """
         return self._log_likelihood
 
-    def _regress(self, printing=True):
+    @property
+    def is_fitted(self):
+        "Boolean: indicator for whether the model has been fitted."
+        return self._is_fitted
+
+    def fit(self, printing=False):
+        """Fit the model and save the results in the model object.
+
+        Ensure the model dataset does not contain NaN values, inf
+        values, categorical or string data.
+
+        Args:
+            printing (bool, optional): display print statements to show
+                progress of function calls (e.g. 'Model fitted'). Defaults
+                to False.
+
+        Raises:
+            ValueError: remove +/- inf values from the model dataset.
+            TypeError: encode categorical columns as dummies before fitting
+                model.
+            ValueError: remove NaN values from the model dataset.
+
+        Returns:
+            Instance of the Logit model object, with the model estimates
+            now stored as attributes.
+        """
         _df_input_conditions(self._X, self._y)
 
         model = sm.Logit(self._y, sm.add_constant(self._X))
@@ -189,8 +214,6 @@ class Logit:
             print("Model fitting in progress...")
         with _SuppressPrints():  # hide Statsmodels printing
             self._results = model.fit()
-        if printing:
-            print("Model fitted.")
         self._results_output = self._results.summary(alpha=self._alpha)
 
         model_selection_dict = {"Log-likelihood": self._results.llf,
@@ -202,7 +225,14 @@ class Logit:
         self._odds_ratios = pd.Series(np.exp(self._results.params
                                              .drop('const')),
                                       name='odds_ratios')
-        pass
+
+        self._standardize_results()
+
+        self._is_fitted = True
+        if printing:
+            print("Model fitted.")
+
+        return self
 
     def _standardize_results(self):
         """Take the unstandardized model and make its results standardized.
@@ -213,8 +243,6 @@ class Logit:
         - Fit model on standardized X and y
         - Gather relevant estimates in a Pandas DataFrame & set to attribute
         """
-        # Drop any rows with NaNs (requires X and y)
-
         # Standardization accounts for NaN values (via Pandas)
         stdev_X = self._X.std(ddof=1)
         self._X_standardized = (
@@ -290,6 +318,9 @@ class Logit:
             np.ndarray: shape (# examples, ) with a prediction for
             each example.
         """
+        if not self._is_fitted:
+            raise ValueError("Ensure model is fitted first.")
+
         regressors_count = self._X.shape[1]
 
         if type(X_predict) != np.ndarray:
@@ -360,6 +391,9 @@ class Logit:
             list: a list of the significant regressor names, if any.
                 If no regressors are significant, then None is returned.
         """
+        if not self._is_fitted:
+            raise ValueError("Ensure model is fitted first.")
+
         if type(alpha) is not float:
             raise TypeError(
                 "Ensure that alpha is a float number in range (0, 0.1]")
