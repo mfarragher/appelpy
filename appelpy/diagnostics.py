@@ -193,34 +193,49 @@ def partial_regression_plot(appelpy_model_object, df, regressor,
                        .fit(disp=0))
         model_var = (sm.OLS(df[regressor], sm.add_constant(df[X_list]))
                      .fit(disp=0))
-
+        chart_plot = sns.regplot(model_var.resid, model_ylist.resid,
+                                 ci=None, truncate=True,
+                                 line_kws={'color': 'red'})
         if annotate_results:
             model_full = (sm.OLS(model_ylist.resid,
                                  sm.add_constant(df[X_list + [regressor]]))
                           .fit(disp=0))
-
-        chart_plot = sns.regplot(model_var.resid, model_ylist.resid,
-                                 ci=None, truncate=True,
-                                 line_kws={'color': 'red'})
-        fig = chart_plot.figure
-        ax.grid()
-        ax.set_ylabel('e({} | X)'.format(y_list[0]))
-        ax.set_xlabel('e({} | X)'.format(regressor))
-        if annotate_results:
             ax.set_title(('Partial regression plot: {}\n(b={:.4f}, t={:.3f})'
                           .format(regressor,
                                   model_full.params.loc[regressor],
                                   model_full.tvalues.loc[regressor])))
         else:
             ax.set_title('Partial regression plot: {}'.format(regressor))
+        fig = chart_plot.figure
+        ax.grid()
+        ax.set_ylabel('e({} | X)'.format(y_list[0]))
+        ax.set_xlabel('e({} | X)'.format(regressor))
         return fig
     elif (regressor not in X_list and regressor in df.columns
           and df[regressor].isnull().any()):
         raise ValueError("""Null values found in the column for the regressor.
         Account for them before calling a partial regression plot.""")
     elif regressor in X_list:
-        raise ValueError("""Function does not currently support use of a
-        regressor that is already in the model.""")
+        cols = list(set(X_list) - set([regressor]))
+        model_ylist = (sm.OLS(df[y_list], sm.add_constant(df[cols]))
+                       .fit(disp=0))
+        model_var = (sm.OLS(df[regressor], sm.add_constant(df[cols]))
+                     .fit(disp=0))
+        chart_plot = sns.regplot(model_var.resid, model_ylist.resid,
+                                 ci=None, truncate=True,
+                                 line_kws={'color': 'red'})
+        if annotate_results:
+            ax.set_title(('Partial regression plot: {}\n(b={:.4f}, t={:.3f})'
+                          .format(regressor,
+                                  appelpy_model_object.params.loc[regressor],
+                                  appelpy_model_object.tvalues.loc[regressor])))
+        else:
+            ax.set_title('Partial regression plot: {}'.format(regressor))
+        fig = chart_plot.figure
+        ax.grid()
+        ax.set_ylabel('e({} | X)'.format(y_list[0]))
+        ax.set_xlabel('e({} | X)'.format(regressor))
+        return fig
     else:
         raise ValueError("Regressor not found in the dataset.")
 
@@ -261,6 +276,8 @@ class BadApples:
             be of the type appelpy.linear_model.OLS.
 
     Methods:
+        fit: calculate the influence measures & heuristics and store the
+            information in the object.
         show_extreme_observations: return a dataframe that shows values that
             have high influence, high leverage or are outliers, based on
             at least one heuristic.
@@ -294,23 +311,13 @@ class BadApples:
     """
 
     def __init__(self, appelpy_model_object):
+        if not appelpy_model_object.is_fitted:
+            raise ValueError("Ensure model is fitted first.")
+
         # Inputs and model info
         self._appelpy_model_object = appelpy_model_object
         self._y = appelpy_model_object.y
         self._X = appelpy_model_object.X
-        # Outputs
-        self._measures_influence = None
-        self._measures_leverage = None
-        self._measures_outliers = None
-        self._indices_high_influence = None
-        self._indices_high_leverage = None
-        self._indices_outliers = None
-
-        # Calculate outliers, leverage and influence:
-        print('Calculating influence measures...')
-        self._calculate()
-        self._calculate_heuristics()
-        print('Calculations saved to object.')
 
     @property
     def y(self):
@@ -424,6 +431,28 @@ class BadApples:
         self._indices_high_influence = influence_points
 
         pass
+
+    def fit(self, printing=False):
+        """Calculate the influence, outlier and leverage measures for the
+        given model.  The method call also calculates the heuristics for
+        determining which observations have 'extreme' values for the measures.
+
+        Args:
+            printing (bool, optional): display print statements to show
+                progress of function calls. Defaults to False.
+
+        Returns:
+            Instance of the BadApples object, with the influence, outlier and
+            leverage measures stored as attributes.
+        """
+        if printing:
+            print('Calculating influence measures...')
+        self._calculate()
+        self._calculate_heuristics()
+        if printing:
+            print('Calculations saved to object.')
+
+        return self
 
     def show_extreme_observations(self):
         """Return a dataframe that shows values that have high influence,
