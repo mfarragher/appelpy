@@ -3,7 +3,8 @@ import os
 import pandas as pd
 import numpy as np
 import itertools
-__all__ = ['DummyEncoder', 'InteractionEncoder']
+__all__ = ['DummyEncoder', 'InteractionEncoder',
+           'get_dataframe_columns_diff']
 
 
 class _SuppressPrints:
@@ -51,51 +52,80 @@ class DummyEncoder:
     formats are supported.
 
     Steps for encoding:
-    - Initialize an encoder object
-    - Use the encode method from the encoder object
+    - Initialize an encoder object (with source dataframe, base level info and
+        policy)
+    - Call the transform method and assign the result to a dataframe
+
+    A 'base level' can be specified for a category (via a
+    dictionary) so that the dummy column for one category value can
+    be dropped.  For example, if category_base_dict is {'rank': 1}
+    then the dummy column for rank_1 is dropped after the encoding.
+
+    There are three different policies for dealing with NaN values
+    in a category:
+    - row_of_zero: the default behaviour in Pandas get_dummies.
+        If the category has a NaN value for a given row, then dummy
+        columns are made from the non-NaN values and so every dummy
+        value will be 0 across the row.
+    - dummy_for_nan: A dummy column is created to signify NaN values
+        for the category (if there are any NaN values for the category).
+    - row_of_nan: If the category has a NaN value for a given row, then
+        dummy columns are made from the non-NaN values, but every dummy
+        value will be NaN across the row.  This is typically the best
+        policy for cases where the NaN values are due to skip patterns
+        or data are missing by design.  For example, if someone is not
+        asked (by design) a set of questions in a survey then the values
+        of those questions would be best represented by NaN.
 
     Args:
-        - df (pd.DataFrame): the dataframe with the categorical columns
+        df (pd.DataFrame): the dataframe with the categorical columns
             to encode.
-        - separator (str): defaults to '_'.  The character that separates
+        separator (str): defaults to '_'.  The character that separates
             the category name and the category value in the encoded column.
+        categorical_col_base_levels (dict): A dictionary comprising categories
+            paired to a base level, e.g. {'rank': 1, 'country':
+            'US', 'age': min}.  The dummy column for the base level
+            is dropped.  If a base level is not desired then
+            specify None explicitly.  The built-in functions max
+            and min can be specified as base levels for the highest
+            and lowest values (respectively) of a category.
+        nan_policy (str, optional): Defaults to 'row_of_zero'.  Select
+            one of three policies for encoding the dummy columns:
+            'row_of_zero', 'dummy_for_nan' and 'row_of_nan'.  See the main
+            description above for an explanation of how each nan_policy
+            works.
 
     Method(s):
-        encode: return a processed dataframe that has the categories
+        transform: return a processed dataframe that has the categories
             encoded in the desired format.
 
     Raises:
         ValueError: separator argument must not be '#'.
-        ValueError: nan_policy must be one of the three valid options.
+        ValueError: nan_policy argument must be one of the three specified
+            in Args.
 
     Attributes:
-        categorical_col_base_levels (dict): each categorical column (key)
-            and its base level (value).
         df (pd.DataFrame): the dataframe subject to the encoding.
-        nan_policy (str): the policy for how to handle categories with NaN
-            values for all of the categories specified in the object.
+        categorical_col_base_levels (dict): the argument passed to the object.
         separator (str): the separator between the category name and category
             value in all encoded columns.
     """
 
-    def __init__(self, df, separator='_'):
+    def __init__(self, df, categorical_col_base_levels,
+                 nan_policy='row_of_zero', separator='_'):
         "Initializes the DummyEncoder object."
         if separator == '#':
             raise ValueError(
                 """'#' is reserved for interaction terms.
                 Use a different character.""")
+        if nan_policy not in ['row_of_zero', 'dummy_for_nan', 'row_of_nan']:
+            raise ValueError("The argument for nan_policy is not valid.")
 
         # Inputs for encoding:
-        self._nan_policy = None
         self._df = df
+        self._categorical_col_base_levels = categorical_col_base_levels
+        self._nan_policy = nan_policy
         self._separator = separator
-        # Outputs from encoding:
-        self._categorical_col_base_levels = None
-
-    @property
-    def nan_policy(self):
-        "str: NaN policy used for encoding."
-        return self._nan_policy
 
     @property
     def df(self):
@@ -103,84 +133,45 @@ class DummyEncoder:
         return self._df
 
     @property
-    def separator(self):
-        "str: separator character."
-        return self._separator
-
-    @property
     def categorical_col_base_levels(self):
         "dict: categorical columns paired with base levels."
         return self._categorical_col_base_levels
 
-    def encode(self, category_base_dict, nan_policy='row_of_zero'):
+    @property
+    def nan_policy(self):
+        "str: NaN policy used for encoding."
+        return self._nan_policy
+
+    @property
+    def separator(self):
+        "str: separator character."
+        return self._separator
+
+    def transform(self):
         """Encode categories into dummy columns for a new dataframe.
-
-        A 'base level' can be specified for a category (via a
-        dictionary) so that the dummy column for one category value can
-        be dropped.  For example, if category_base_dict is {'rank': 1}
-        then the dummy column for rank_1 is dropped after the encoding.
-
-        There are three different policies for dealing with NaN values
-        in a category:
-        - row_of_zero: the default behaviour in Pandas get_dummies.
-            If the category has a NaN value for a given row, then dummy
-            columns are made from the non-NaN values and so every dummy
-            value will be 0 across the row.
-        - dummy_for_nan: A dummy column is created to signify NaN values
-            for the category (if there are any NaN values for the category).
-        - row_of_nan: If the category has a NaN value for a given row, then
-            dummy columns are made from the non-NaN values, but every dummy
-            value will be NaN across the row.  This is typically the best
-            policy for cases where the NaN values are due to skip patterns
-            or data are missing by design.  For example, if someone is not
-            asked (by design) a set of questions in a survey then the values
-            of those questions would be best represented by NaN.
-
-        Args:
-            category_base_dict (dict): A dictionary comprising categories
-                paired to a base level, e.g. {'rank': 1, 'country':
-                'US', 'age': min}.  The dummy column for the base level
-                is dropped.  If a base level is not desired then
-                specify None explicitly.  The built-in functions max
-                and min can be specified as base levels for the highest
-                and lowest values (respectively) of a category.
-            nan_policy (str, optional): Defaults to 'row_of_zero'.  Select
-                one of three policies for encoding the dummy columns:
-                'row_of_zero', 'dummy_for_nan' and 'row_of_nan'.  See the main
-                description above for an explanation of how each nan_policy
-                works.
-
-        Raises:
-            ValueError: nan_policy must be one of the three valid options.
 
         Returns:
             pd.DataFrame: dataframe with categories encoded into dummy columns.
         """
-
-        if nan_policy not in ['row_of_zero', 'dummy_for_nan', 'row_of_nan']:
-            raise ValueError("The argument for nan_policy is not valid.")
-
-        self._categorical_col_base_levels = category_base_dict
-        self._nan_policy = nan_policy
-
         # Initialize the dataframe that will be returned
         processed_df = self._df.copy()
 
         # Iterate the categorization through each col:
-        for col in category_base_dict.keys():
+        for col in self._categorical_col_base_levels.keys():
             # Determine the base level
-            base_level = category_base_dict[col]
-            if category_base_dict[col] == min:
+            base_level = self._categorical_col_base_levels[col]
+            if self._categorical_col_base_levels[col] == min:
                 base_level = min(self._df[col].dropna().unique())
-            if category_base_dict[col] == max:
+                self._categorical_col_base_levels[col] = base_level
+            if self._categorical_col_base_levels[col] == max:
                 base_level = max(self._df[col].dropna().unique())
-            self._categorical_col_base_levels[col] = base_level
+                self._categorical_col_base_levels[col] = base_level
 
             # GENERATE DUMMIES GIVEN THE nan_policy
-            if nan_policy == 'row_of_zero':  # Pandas default behaviour
+            if self._nan_policy == 'row_of_zero':  # Pandas default behaviour
                 dummy_cols = pd.get_dummies(
                     self._df[col], prefix=col, prefix_sep=self._separator)
-            if nan_policy == 'dummy_for_nan':
+            if self._nan_policy == 'dummy_for_nan':
                 # If there are no NaN category values then do not create
                 # a NaN dummy:
                 if np.count_nonzero((~pd.isna(self._df[col].to_numpy()))
@@ -196,7 +187,7 @@ class DummyEncoder:
                     nan_dummy_col_str = ''.join([col, self._separator, 'nan'])
                     dummy_cols[nan_dummy_col_str] = np.where(
                         dummy_cols.sum(axis='columns') == 0, 1, 0)
-            if nan_policy == 'row_of_nan':
+            if self._nan_policy == 'row_of_nan':
                 dummy_cols = pd.get_dummies(self._df[col], prefix=col,
                                             prefix_sep=self._separator)
                 # Replace the zero vals with NaN:
@@ -241,36 +232,34 @@ class InteractionEncoder:
     pd.Categorical.
 
     Steps for encoding:
-    - Initialize an encoder object
-    - Use the encode method from the encoder object
+    - Initialize an encoder object (with source dataframe and dictionary
+        of columns to interact)
+    - Call the transform method and assign the result to a dataframe
 
     Method(s):
-        encode: return a processed dataframe that has the categories
+        transform: return a processed dataframe that has the categories
             encoded in the desired format.
 
     Attributes:
-        columns_removed (list): list of columns that are in the original
-            dataframe but dropped from the final dataframe.  These are
-            typically the columns that represent main effects for
-            categorical variables.
-        columns_added (list): list of columns that are in the final dataframe
-            but not in the original dataframe.  These include the column names
-            for the interaction effects and the dummy columns encoded from
-            categorical variables.
         df (pd.DataFrame): dataframe with columns encoded to capture
             interaction effects between the specified variables.
+        interactions (dict): a dictionary that specifies the columns
+            to be interacted.  Each dictionary value must be a list of
+            column(s) in the dataframe.
+            For example, {'temperature': ['pressure']} would
+            be the specification to generate an interaction effect
+            term 'temperature#pressure' for an interaction between the two
+            continuous variables 'temperature' and 'pressure'.
         separator (str): the separator between the category name and category
             value in all encoded columns, where DummyEncoder is used.
     """
 
-    def __init__(self, df, separator='_'):
+    def __init__(self, df, interactions, separator='_'):
         "Initializes the InteractionEncoder object."
         # Inputs for encoding:
         self._df = df
+        self._interactions = interactions
         self._separator = separator
-        # Outputs from encoding:
-        self._columns_removed = None
-        self._columns_added = None
 
     @property
     def df(self):
@@ -278,34 +267,17 @@ class InteractionEncoder:
         return self._df
 
     @property
+    def interactions(self):
+        "dict: the columns to be interacted."
+        return self._interactions
+
+    @property
     def separator(self):
         "str: separator character"
         return self._separator
 
-    @property
-    def columns_removed(self):
-        "list: columns removed from the original df as a result of encoding."
-        return self._columns_removed
-
-    @property
-    def columns_added(self):
-        "list: columns added to the final dataframe as a result of encoding."
-        return self._columns_added
-
-    def encode(self, interactions_dict):
+    def transform(self):
         """Encode interactions between variables.
-
-        Pass a dictionary of key-value pairs, where each value is a list of
-        columns to interact with the column represented by the key.
-
-        Args:
-            interactions_dict (dict): a dictionary that specifies the columns
-                to be interacted.  Each dictionary value must be a list of
-                column(s) in the dataframe.
-                For example, {'temperature': ['pressure']} would
-                be the specification to generate an interaction effect
-                term 'temperature#pressure' for an interaction between the two
-                continuous variables 'temperature' and 'pressure'.
 
         Returns:
             pd.DataFrame: dataframe with interaction effects added.
@@ -315,7 +287,7 @@ class InteractionEncoder:
         processed_df = self._df.copy()
 
         # Iterate the generation of interaction cols through each pair of cols:
-        for col_name, cols_to_interact_list in interactions_dict.items():
+        for col_name, cols_to_interact_list in self._interactions.items():
             for col_other in cols_to_interact_list:
                 # Gather dtype strings for the cols, e.g. 'categorical'
                 col_dtype = self._df[col_name].dtype.name
@@ -389,9 +361,10 @@ class InteractionEncoder:
                                                                     aux_df[col_other_value])
                     # Remove original non-categorical cols and replace with dummies:
                     dummy_encoder = DummyEncoder(processed_df,
+                                                 {col_name: None,
+                                                  col_other: None},
                                                  separator=self._separator)
-                    processed_df = dummy_encoder.encode(
-                        {col_name: None, col_other: None})
+                    processed_df = dummy_encoder.transform()
                     # Add interaction cols:
                     processed_df = pd.concat([processed_df, interaction_dummies_df],
                                              axis='columns')
@@ -408,8 +381,9 @@ class InteractionEncoder:
                                                                     aux_df[col_other_value])
                     # Remove original non-Bool col and replace with dummies:
                     dummy_encoder = DummyEncoder(processed_df,
+                                                 {col_other: None},
                                                  separator=self._separator)
-                    processed_df = dummy_encoder.encode({col_other: None})
+                    processed_df = dummy_encoder.transform()
                     # Add interaction cols:
                     processed_df = pd.concat([processed_df, interaction_dummies_df],
                                              axis='columns')
@@ -424,8 +398,9 @@ class InteractionEncoder:
                                                                     * col_other_dummies)
                     # Remove original non-Bool col and replace with dummies:
                     dummy_encoder = DummyEncoder(processed_df,
+                                                 {col_name: None},
                                                  separator=self._separator)
-                    processed_df = dummy_encoder.encode({col_name: None})
+                    processed_df = dummy_encoder.transform()
                     # Add interaction cols:
                     processed_df = pd.concat([processed_df, interaction_dummies_df],
                                              axis='columns')
@@ -463,8 +438,9 @@ class InteractionEncoder:
                                                                     * self._df[col_other])
                     # Remove original non-categorical cols and replace with dummies:
                     dummy_encoder = DummyEncoder(processed_df,
+                                                 {col_name: None},
                                                  separator=self._separator)
-                    processed_df = dummy_encoder.encode({col_name: None})
+                    processed_df = dummy_encoder.transform()
                     # Add interaction cols:
                     processed_df = pd.concat([processed_df, interaction_dummies_df],
                                              axis='columns')
@@ -480,19 +456,45 @@ class InteractionEncoder:
                     # Remove original non-categorical cols and replace with
                     # dummies:
                     dummy_encoder = DummyEncoder(processed_df,
+                                                 {col_other: None},
                                                  separator=self._separator)
-                    processed_df = dummy_encoder.encode({col_other: None})
+                    processed_df = dummy_encoder.transform()
                     # Add interaction cols:
                     processed_df = pd.concat([processed_df,
                                               interaction_dummies_df],
                                              axis='columns')
                     continue
 
-        # Collect columns added to the final dataframe and removed from
-        # original dataframe:
-        self._columns_removed = list((set(self._df.columns)
-                                      - set(processed_df.columns)))
-        self._columns_added = list((set(processed_df.columns)
-                                    - set(self._df.columns)))
-
         return processed_df
+
+
+def get_dataframe_columns_diff(df_minuend, df_subtrahend):
+    """Get the diff between the columns of two dataframes, where
+    df_minuend - df_subtrahend = df_diff
+
+    This method is useful for keeping track of differences between
+    dataframes' columns when doing column encoding (e.g. comparing a
+    raw dataframe `df_raw` and transformed dataframe `df_transformed`).
+
+    To get the 'columns added' to `df_raw` compared to `df_transformed`,
+    call the function:
+        cols_added = get_dataframe_columns_diff(df_transformed, df_raw)
+
+    To get the 'columns removed' from `df_raw`, compared to `df_transformed`,
+    call the function:
+        cols_removed = get_dataframe_columns_diff(df_raw, df_transformed)
+
+    Args:
+        df_minuend (pd.DataFrame): the dataframe before the minus operator.
+        df_subtrahend (pd.DataFrame): the dataframe after the minus operator.
+
+    Raises:
+        TypeError: Ensure Pandas dataframes are given as arguments.
+
+    Returns:
+        list: the diff in columns between the two dataframes.
+    """
+    if (not isinstance(df_minuend, pd.DataFrame) or
+            (not isinstance(df_subtrahend, pd.DataFrame))):
+        raise TypeError("Ensure Pandas dataframes are given as arguments.")
+    return list(set(df_minuend.columns) - set(df_subtrahend.columns))
