@@ -18,7 +18,7 @@ def model_wells():
         df[col] = np.where(df[col] == 'yes', 1, 0)
     # Model test case
     X_list = ['arsenic', 'distance', 'education', 'association']
-    model = Logit(df, ['switch'], X_list)
+    model = Logit(df, ['switch'], X_list).fit()
     return model
 
 
@@ -31,8 +31,8 @@ def model_birthwt():
     df['race'] = (df['race'].replace(race_dict)
                   .astype('category'))
 
-    dummy_enc = DummyEncoder(df)
-    df = dummy_enc.encode({'race': 'white'})
+    dummy_enc = DummyEncoder(df, {'race': 'white'})
+    df = dummy_enc.transform()
     for col in ['race_black', 'race_other']:
         df[col] = df[col].astype(int)
 
@@ -40,7 +40,7 @@ def model_birthwt():
     X_list = ['smoke', 'race_black', 'race_other']
     y_list = ['low']
 
-    model = Logit(df, y_list, X_list)
+    model = Logit(df, y_list, X_list).fit()
     return model
 
 
@@ -48,22 +48,35 @@ def model_birthwt():
 def model_mtcars():
     df = sm.datasets.get_rdataset('mtcars').data
     X_list = ['wt', 'disp']
-    model = Logit(df, ['vs'], X_list)
+    model = Logit(df, ['vs'], X_list).fit()
     return model
 
 
-def test_aic(model_wells):
-    expected_aic = 3917.8
-    assert np.round(
-        model_wells.model_selection_stats['AIC'], 1) == expected_aic
+def test_model_not_fitted():
+    df = sm.datasets.get_rdataset('mtcars').data
+    X_list = ['wt', 'disp']
+    model = Logit(df, ['vs'], X_list)
+
+    assert not model.is_fitted
+    with pytest.raises(ValueError):
+        model.significant_regressors(0.05)
+    with pytest.raises(ValueError):
+        model.predict(model.X.mean())
 
 
-def test_log_likelihood(model_wells):
-    expected_log_likelihood = -1953.913
-    assert np.round(model_wells.log_likelihood, 3) == expected_log_likelihood
+def test_prints(capsys):
+    df = sm.datasets.get_rdataset('mtcars').data
+    X_list = ['wt', 'disp']
+    Logit(df, ['vs'], X_list).fit(printing=True)
+
+    captured = capsys.readouterr()
+    expected_print = "Model fitting in progress...\nModel fitted.\n"
+    assert captured.out == expected_print
 
 
 def test_coefficients(model_wells):
+    assert model_wells.is_fitted
+
     expected_coef = pd.Series({'const': -0.156712,
                                'arsenic': 0.467022,
                                'distance': -0.008961,
@@ -94,6 +107,17 @@ def test_z_scores(model_wells):
                                   'association': -1.615})
     assert_series_equal(model_wells.results.tvalues.round(3), expected_z_score)
     assert not model_wells.results.use_t
+
+
+def test_aic(model_wells):
+    expected_aic = 3917.8
+    assert np.round(
+        model_wells.model_selection_stats['AIC'], 1) == expected_aic
+
+
+def test_log_likelihood(model_wells):
+    expected_log_likelihood = -1953.913
+    assert np.round(model_wells.log_likelihood, 3) == expected_log_likelihood
 
 
 def test_significant_regressors(model_wells, model_mtcars):

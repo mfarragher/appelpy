@@ -16,20 +16,20 @@ def model_salaries():
                   .str.replace(r"[ ,.,-]", '_')
                   .str.lower())
     # Make dummy cols
-    dummy_encoder = DummyEncoder(df)
-    df = dummy_encoder.encode({'rank': 'AsstProf',
-                               'discipline': 'A',
-                               'sex': 'Female'})
+    base_levels = {'rank': 'AsstProf',
+                   'discipline': 'A',
+                   'sex': 'Female'}
+    df = DummyEncoder(df, base_levels).transform()
 
     y_list = ['salary']
     X_list = ['rank_AssocProf', 'rank_Prof', 'discipline_B',
               'yrs_since_phd', 'yrs_service', 'sex_Male']
 
-    model_ols = OLS(df, y_list, X_list)
+    model_ols = OLS(df, y_list, X_list).fit()
 
     weights = 1 / (model_ols.resid) ** 2
 
-    model_wls = WLS(df, y_list, X_list, w=weights)
+    model_wls = WLS(df, y_list, X_list, w=weights).fit()
 
     return model_wls
 
@@ -43,11 +43,29 @@ def model_caschools():
 
     # Model: WLS with no weights - equivalent to OLS
     X_list = ['avginc', 'avginc_sq']
-    model = WLS(df, ['testscr'], X_list, w=None)
+    model = WLS(df, ['testscr'], X_list, w=None).fit()
     return model
 
 
+def test_prints(capsys):
+    df = sm.datasets.get_rdataset('Caschool', 'Ecdat').data
+
+    # Square income
+    df['avginc_sq'] = df['avginc'] ** 2
+
+    # Model: WLS with no weights - equivalent to OLS
+    X_list = ['avginc', 'avginc_sq']
+
+    WLS(df, ['testscr'], X_list, w=None).fit(printing=True)
+
+    captured = capsys.readouterr()
+    expected_print = "Model fitting in progress...\nModel fitted.\n"
+    assert captured.out == expected_print
+
+
 def test_coefficients(model_salaries):
+    assert model_salaries.is_fitted
+
     expected_coef = pd.Series({'const': 64897.52,
                                'rank_AssocProf': 13372.32,
                                'rank_Prof': 45544.09,

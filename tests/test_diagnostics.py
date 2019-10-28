@@ -24,7 +24,7 @@ def model_mtcars_long():
     df = sm.datasets.get_rdataset('mtcars').data
     X_list = ['cyl', 'disp', 'hp', 'drat', 'wt',
               'qsec', 'vs', 'am', 'gear', 'carb']
-    model = OLS(df, ['mpg'], X_list)
+    model = OLS(df, ['mpg'], X_list).fit()
     return model
 
 
@@ -32,7 +32,7 @@ def model_mtcars_long():
 def model_mtcars_short():
     df = sm.datasets.get_rdataset('mtcars').data
     X_list = ['cyl', 'wt', 'disp']
-    model = OLS(df, ['mpg'], X_list)
+    model = OLS(df, ['mpg'], X_list).fit()
     return model
 
 
@@ -45,7 +45,7 @@ def model_journals():
     df['ln_oclc'] = np.log(df['oclc'])
     df['ln_ppc'] = np.log(df['libprice'] / df['citestot'])
 
-    model = OLS(df, ['ln_oclc'], ['ln_ppc'])
+    model = OLS(df, ['ln_oclc'], ['ln_ppc']).fit()
     return model
 
 
@@ -53,7 +53,7 @@ def model_journals():
 def model_cars():
     df = sm.datasets.get_rdataset('cars').data
     X_list = ['speed']
-    model = OLS(df, ['dist'], X_list)
+    model = OLS(df, ['dist'], X_list).fit()
     return model
 
 
@@ -61,11 +61,22 @@ def model_cars():
 def bad_apples_hills():
     df = sm.datasets.get_rdataset('hills', 'MASS').data
 
-    model = OLS(df, ['time'], ['dist', 'climb'])
+    model = OLS(df, ['time'], ['dist', 'climb']).fit()
 
-    bad_apples = BadApples(model)
+    bad_apples = BadApples(model).fit()
 
     return bad_apples
+
+
+def test_model_not_fitted():
+    df = sm.datasets.get_rdataset('cars').data
+    X_list = ['speed']
+    model = OLS(df, ['dist'], X_list)
+
+    assert not model.is_fitted
+
+    with pytest.raises(ValueError):
+        BadApples(model).fit()
 
 
 def test_variance_inflation_factors(model_mtcars_long):
@@ -81,6 +92,18 @@ def test_variance_inflation_factors(model_mtcars_long):
                               'carb': 7.908747}, name='VIF')
     df_vif = variance_inflation_factors(model_mtcars_long.X)
     assert_series_equal(df_vif['VIF'].round(6), expected_vif)
+
+
+def test_bad_apple_prints(capsys):
+    df = sm.datasets.get_rdataset('hills', 'MASS').data
+
+    model = OLS(df, ['time'], ['dist', 'climb']).fit()
+
+    BadApples(model).fit(printing=True)
+
+    captured = capsys.readouterr()
+    expected_print = "Calculating influence measures...\nCalculations saved to object.\n"
+    assert captured.out == expected_print
 
 
 def test_influence(bad_apples_hills):
@@ -370,7 +393,7 @@ def test_lrv2_plot(model_mtcars_short):
     sorted_expected_data = expected_data[expected_data[:, 0].argsort()]
 
     # Get actual data
-    bad_apples = BadApples(model_mtcars_short)
+    bad_apples = BadApples(model_mtcars_short).fit()
     assert_series_equal(bad_apples.y, model_mtcars_short.y)
     assert_frame_equal(bad_apples.X, model_mtcars_short.X)
     # 1) default method call
@@ -427,7 +450,9 @@ def test_partial_regression_plot(df_prestige):
     model_wo_women = OLS(df_prestige,
                          ['prestige'],
                          ['education', 'log2_income'])
-
+    model_w_women = OLS(df_prestige,
+                        ['prestige'],
+                        ['education', 'log2_income', 'women'])
     # Expected results with 'women' as added variable
     sorted_expected_data = (
         np.array([[-93.93836, -58.57753, -55.49617, -42.11369, -35.66954, -25.9112,
@@ -468,6 +493,16 @@ def test_partial_regression_plot(df_prestige):
 
     # model_wo_women
     fig = partial_regression_plot(model_wo_women, df_prestige, 'women')
+    assert isinstance(fig, matplotlib.figure.Figure)
+    actual_data = fig.get_axes()[0].collections[0].get_offsets().data
+    sorted_actual_data = actual_data[actual_data[:, 0].argsort()]
+    assert_numpy_array_equal(np.round(sorted_actual_data, 5),
+                             sorted_expected_data)
+
+    # model_w_women
+    plt.cla()
+    plt.close('all')
+    fig = partial_regression_plot(model_w_women, df_prestige, 'women')
     assert isinstance(fig, matplotlib.figure.Figure)
     actual_data = fig.get_axes()[0].collections[0].get_offsets().data
     sorted_actual_data = actual_data[actual_data[:, 0].argsort()]

@@ -15,7 +15,7 @@ from appelpy.linear_model import OLS
 def model_mtcars_final():
     df = sm.datasets.get_rdataset('mtcars').data
     X_list = ['wt', 'qsec', 'am']
-    model = OLS(df, ['mpg'], X_list)
+    model = OLS(df, ['mpg'], X_list).fit()
     return model
 
 
@@ -23,7 +23,7 @@ def model_mtcars_final():
 def model_cars():
     df = sm.datasets.get_rdataset('cars').data
     X_list = ['speed']
-    model = OLS(df, ['dist'], X_list)
+    model = OLS(df, ['dist'], X_list).fit()
     return model
 
 
@@ -35,10 +35,11 @@ def model_cars93():
                   .str.replace(r"[ ,.,-]", '_')
                   .str.lower())
     # Dummy columns
-    dummy_encoder = DummyEncoder(df, separator='_')
-    df = dummy_encoder.encode({'type': 'Compact',
-                               'airbags': 'None',
-                               'origin': 'USA'})
+    base_levels = {'type': 'Compact',
+                   'airbags': 'None',
+                   'origin': 'USA'}
+    dummy_encoder = DummyEncoder(df, base_levels, separator='_')
+    df = dummy_encoder.transform()
     df.columns = (df.columns
                   .str.replace(r"[ ,.,-]", '_')
                   .str.lower())
@@ -48,7 +49,7 @@ def model_cars93():
               'mpg_city',
               'airbags_driver_&_passenger', 'airbags_driver_only',
               'origin_non_usa']
-    model = OLS(df, ['price'], X_list)
+    model = OLS(df, ['price'], X_list).fit()
     return model
 
 
@@ -61,14 +62,36 @@ def model_caschools():
 
     # Model
     X_list = ['avginc', 'avginc_sq']
-    model = OLS(df, ['testscr'], X_list)
+    model = OLS(df, ['testscr'], X_list).fit()
     return model
 
 
-# - TESTS -
+def test_model_not_fitted():
+    df = sm.datasets.get_rdataset('cars').data
+    X_list = ['speed']
+    model = OLS(df, ['dist'], X_list)
+
+    assert not model.is_fitted
+    with pytest.raises(ValueError):
+        model.significant_regressors(0.05)
+    with pytest.raises(ValueError):
+        model.predict(model.X.mean())
+
+
+def test_prints(capsys):
+    df = sm.datasets.get_rdataset('cars').data
+    X_list = ['speed']
+
+    OLS(df, ['dist'], X_list).fit(printing=True)
+
+    captured = capsys.readouterr()
+    expected_print = "Model fitting in progress...\nModel fitted.\n"
+    assert captured.out == expected_print
 
 
 def test_coefficients(model_mtcars_final):
+    assert model_mtcars_final.is_fitted
+
     expected_coef = pd.Series({'const': 9.6178,
                                'wt': -3.9165,
                                'qsec': 1.2259,
