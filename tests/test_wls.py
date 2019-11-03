@@ -47,6 +47,7 @@ def model_caschools():
     return model
 
 
+@pytest.mark.remote_data
 def test_prints(capsys):
     df = sm.datasets.get_rdataset('Caschool', 'Ecdat').data
 
@@ -63,6 +64,7 @@ def test_prints(capsys):
     assert captured.out == expected_print
 
 
+@pytest.mark.remote_data
 def test_coefficients(model_salaries):
     assert model_salaries.is_fitted
 
@@ -82,6 +84,7 @@ def test_coefficients(model_salaries):
                       pd.io.formats.style.Styler)
 
 
+@pytest.mark.remote_data
 def test_standard_errors(model_salaries):
     expected_se = pd.Series({'const': 710.12,
                              'rank_AssocProf': 350.33,
@@ -96,6 +99,7 @@ def test_standard_errors(model_salaries):
     assert(model_salaries.cov_type == 'nonrobust')
 
 
+@pytest.mark.remote_data
 def test_t_scores(model_salaries):
     expected_t_score = pd.Series({'const': 91.390,
                                   'rank_AssocProf': 38.171,
@@ -109,6 +113,7 @@ def test_t_scores(model_salaries):
     assert model_salaries.results.use_t
 
 
+@pytest.mark.remote_data
 def test_model_selection_stats(model_salaries):
     expected_root_mse = 1.001
     expected_r_squared = 0.9977
@@ -125,6 +130,7 @@ def test_model_selection_stats(model_salaries):
            == expected_r_squared_adj)
 
 
+@pytest.mark.remote_data
 def test_significant_regressors(model_salaries):
     expected_regressors_001 = ['rank_AssocProf', 'rank_Prof', 'discipline_B',
                                'yrs_since_phd', 'yrs_service', 'sex_Male']  # 0.1% sig
@@ -150,6 +156,7 @@ def test_significant_regressors(model_salaries):
         model_salaries.significant_regressors(0.11)
 
 
+@pytest.mark.remote_data
 def test_ols_wls_equivalence(model_caschools):
     # Check weights are vals of 1
     expected_weights = pd.Series(np.ones(len(model_caschools.X)))
@@ -161,12 +168,12 @@ def test_ols_wls_equivalence(model_caschools):
     # Predictions
     # Est effect of avg 10 -> 11:
     expected_y_hat_diff = 2.9625
-    actual_y_hat_diff = (model_caschools.predict(pd.Series([11, 11 ** 2])) -
-                         model_caschools.predict(pd.Series([10, 10 ** 2])))[0]
+    actual_y_hat_diff = (model_caschools.predict(np.array([[11, 11 ** 2]])) -
+                         model_caschools.predict(np.array([[10, 10 ** 2]])))[0]
     assert np.round(actual_y_hat_diff, 4) == expected_y_hat_diff
 
     # Est effect of avg 40 -> 41:
     expected_y_hat_diff = 0.4240
-    actual_y_hat_diff = (model_caschools.predict(pd.Series([41, 41 ** 2])) -
-                         model_caschools.predict(pd.Series([40, 40 ** 2])))[0]
+    actual_y_hat_diff = (model_caschools.predict(np.array([[41, 41 ** 2]])) -
+                         model_caschools.predict(np.array([[40, 40 ** 2]])))[0]
     assert np.round(actual_y_hat_diff, 4) == expected_y_hat_diff

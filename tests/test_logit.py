@@ -4,8 +4,7 @@ import statsmodels.api as sm
 import pandas as pd
 import numpy as np
 from pandas.util.testing import (assert_series_equal,
-                                 assert_numpy_array_equal,
-                                 assert_frame_equal)
+                                 assert_numpy_array_equal)
 from appelpy.discrete_model import Logit
 from appelpy.utils import DummyEncoder
 
@@ -45,13 +44,22 @@ def model_birthwt():
 
 
 @pytest.fixture(scope='module')
-def model_mtcars():
+def model_mtcars_vs():
     df = sm.datasets.get_rdataset('mtcars').data
     X_list = ['wt', 'disp']
     model = Logit(df, ['vs'], X_list).fit()
     return model
 
 
+@pytest.fixture(scope='module')
+def model_mtcars_am():
+    df = sm.datasets.get_rdataset('mtcars').data
+    X_list = ['mpg']
+    model = Logit(df, ['am'], X_list).fit()
+    return model
+
+
+@pytest.mark.remote_data
 def test_model_not_fitted():
     df = sm.datasets.get_rdataset('mtcars').data
     X_list = ['wt', 'disp']
@@ -64,6 +72,7 @@ def test_model_not_fitted():
         model.predict(model.X.mean())
 
 
+@pytest.mark.remote_data
 def test_prints(capsys):
     df = sm.datasets.get_rdataset('mtcars').data
     X_list = ['wt', 'disp']
@@ -74,6 +83,7 @@ def test_prints(capsys):
     assert captured.out == expected_print
 
 
+@pytest.mark.remote_data
 def test_coefficients(model_wells):
     assert model_wells.is_fitted
 
@@ -90,6 +100,20 @@ def test_coefficients(model_wells):
                       pd.io.formats.style.Styler)
 
 
+@pytest.mark.remote_data
+def test_coefficients_beta(model_mtcars_vs):
+    expected_coefs = pd.Series({'wt': 1.5913,
+                                'disp': -4.2677},
+                               name='coef_stdX')
+    expected_coefs.index.name = 'vs'
+    assert_series_equal((model_mtcars_vs
+                         .results_output_standardized
+                         .data['coef_stdX']
+                         .round(4)),
+                        expected_coefs)
+
+
+@pytest.mark.remote_data
 def test_standard_errors(model_wells):
     expected_se = pd.Series({'const': 0.099601,
                              'arsenic': 0.041602,
@@ -99,6 +123,7 @@ def test_standard_errors(model_wells):
     assert_series_equal(model_wells.results.bse.round(6), expected_se)
 
 
+@pytest.mark.remote_data
 def test_z_scores(model_wells):
     expected_z_score = pd.Series({'const': -1.573,
                                   'arsenic': 11.226,
@@ -109,26 +134,31 @@ def test_z_scores(model_wells):
     assert not model_wells.results.use_t
 
 
+@pytest.mark.remote_data
 def test_aic(model_wells):
     expected_aic = 3917.8
     assert np.round(
         model_wells.model_selection_stats['AIC'], 1) == expected_aic
 
 
+@pytest.mark.remote_data
 def test_log_likelihood(model_wells):
     expected_log_likelihood = -1953.913
     assert np.round(model_wells.log_likelihood, 3) == expected_log_likelihood
 
 
-def test_significant_regressors(model_wells, model_mtcars):
+@pytest.mark.remote_data
+def test_significant_regressors(model_wells, model_mtcars_vs):
     # Results output:
     assert model_wells.alpha == 0.05
 
     # Significant regressors method - check p=0.001
     expected_regressors_wells = ['arsenic', 'distance', 'education']
-    assert model_wells.significant_regressors(0.001) == expected_regressors_wells
+    assert (model_wells.significant_regressors(0.001)
+            == expected_regressors_wells)
     expected_regressors_mtcars = []
-    assert model_mtcars.significant_regressors(0.001) == expected_regressors_mtcars
+    assert (model_mtcars_vs.significant_regressors(0.001)
+            == expected_regressors_mtcars)
 
     with pytest.raises(TypeError):
         model_wells.significant_regressors('str')
@@ -143,28 +173,48 @@ def test_significant_regressors(model_wells, model_mtcars):
         model_wells.significant_regressors(0.11)
 
 
+@pytest.mark.remote_data
 def test_odds_ratio(model_birthwt):
     expected_odds_ratios_smoking = 3.052631
     assert(np.round(model_birthwt.odds_ratios.loc['smoke'], 6)
            == expected_odds_ratios_smoking)
 
 
-def test_other_properties(model_mtcars):
-    assert isinstance(model_mtcars.X, pd.DataFrame)
-    assert isinstance(model_mtcars.y, pd.Series)
+@pytest.mark.remote_data
+def test_other_properties(model_mtcars_vs):
+    assert isinstance(model_mtcars_vs.X, pd.DataFrame)
+    assert isinstance(model_mtcars_vs.y, pd.Series)
 
 
-def test_predictions(model_mtcars):
+@pytest.mark.remote_data
+def test_predictions(model_mtcars_vs, model_mtcars_am):
     expected_pred = np.array([0.2361081, np.NaN])
-    actual_pred = model_mtcars.predict(
+    actual_pred = model_mtcars_vs.predict(
         pd.DataFrame(data={'wt': [2.1, -1000000],
-                           'disp': [180, -1000000]}))
+                           'disp': [180, -1000000]}).values)
     assert_numpy_array_equal(np.round(actual_pred, 7),
                              expected_pred)
 
     expected_pred = np.array([0.2361081, 0])
-    actual_pred = model_mtcars.predict(
+    actual_pred = model_mtcars_vs.predict(
         pd.DataFrame(data={'wt': [2.1, -1000000],
-                           'disp': [180, -1000000]}), within_sample=False)
+                           'disp': [180, -1000000]}).values,
+        within_sample=False)
     assert_numpy_array_equal(np.round(actual_pred, 7),
                              expected_pred)
+
+    expected_pred = np.array([0.1194021, 0.3862832, 0.7450109])
+    actual_pred = model_mtcars_am.predict(
+        np.array(([[15], [20], [25]])))
+    assert_numpy_array_equal(np.round(actual_pred, 7),
+                             expected_pred)
+
+    with pytest.raises(TypeError):
+        model_mtcars_am.predict(
+            pd.DataFrame(np.array(([[15], [20], [25]]))
+                         ))
+    with pytest.raises(ValueError):
+        # One-regressor model with two regressors fed to predict
+        model_mtcars_am.predict(
+            np.array(([15, 20, 25],
+                      [1, 2, 3])))

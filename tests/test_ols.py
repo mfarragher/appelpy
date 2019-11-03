@@ -66,6 +66,7 @@ def model_caschools():
     return model
 
 
+@pytest.mark.remote_data
 def test_model_not_fitted():
     df = sm.datasets.get_rdataset('cars').data
     X_list = ['speed']
@@ -78,6 +79,7 @@ def test_model_not_fitted():
         model.predict(model.X.mean())
 
 
+@pytest.mark.remote_data
 def test_prints(capsys):
     df = sm.datasets.get_rdataset('cars').data
     X_list = ['speed']
@@ -89,6 +91,7 @@ def test_prints(capsys):
     assert captured.out == expected_print
 
 
+@pytest.mark.remote_data
 def test_coefficients(model_mtcars_final):
     assert model_mtcars_final.is_fitted
 
@@ -105,6 +108,7 @@ def test_coefficients(model_mtcars_final):
                       pd.io.formats.style.Styler)
 
 
+@pytest.mark.remote_data
 def test_coefficients_beta(model_cars93):
     expected_coefs = pd.Series({'type_large': 0.10338,
                                 'type_midsize': 0.22813,
@@ -124,6 +128,7 @@ def test_coefficients_beta(model_cars93):
                         expected_coefs)
 
 
+@pytest.mark.remote_data
 def test_standard_errors(model_mtcars_final):
     expected_se = pd.Series({'const': 6.9596,
                              'wt': 0.7112,
@@ -135,6 +140,7 @@ def test_standard_errors(model_mtcars_final):
     assert(model_mtcars_final.cov_type == 'nonrobust')
 
 
+@pytest.mark.remote_data
 def test_t_scores(model_mtcars_final):
     expected_t_score = pd.Series({'const': 1.382,
                                   'wt': -5.507,
@@ -145,6 +151,7 @@ def test_t_scores(model_mtcars_final):
     assert model_mtcars_final.results.use_t
 
 
+@pytest.mark.remote_data
 def test_model_selection_stats(model_mtcars_final):
     expected_root_mse = 2.459
     expected_r_squared = 0.8497
@@ -161,6 +168,7 @@ def test_model_selection_stats(model_mtcars_final):
            == expected_r_squared_adj)
 
 
+@pytest.mark.remote_data
 def test_significant_regressors(model_mtcars_final):
     expected_regressors_000001 = []
     expected_regressors_001 = ['wt', 'qsec']  # 0.1% sig
@@ -189,6 +197,7 @@ def test_significant_regressors(model_mtcars_final):
         model_mtcars_final.significant_regressors(0.11)
 
 
+@pytest.mark.remote_data
 def test_other_attributes(model_mtcars_final):
     # Weights
     expected_w = np.ones(32)
@@ -239,18 +248,21 @@ def test_other_attributes(model_mtcars_final):
                              expected_qsec_standardized)
 
 
+@pytest.mark.remote_data
 def test_predictions(model_caschools):
     # Est effect of avg 10 -> 11:
     expected_y_hat_diff = 2.9625
-    actual_y_hat_diff = (model_caschools.predict(pd.Series([11, 11 ** 2])) -
-                         model_caschools.predict(pd.Series([10, 10 ** 2])))[0]
+    actual_y_hat_diff = (model_caschools.predict(np.array([[11, 11 ** 2]])) -
+                         model_caschools.predict(np.array([[10, 10 ** 2]])))[0]
     assert np.round(actual_y_hat_diff, 4) == expected_y_hat_diff
 
     # Est effect of avg 40 -> 41:
     expected_y_hat_diff = 0.4240
-    actual_y_hat_diff = (model_caschools.predict(pd.Series([41, 41 ** 2])) -
-                         model_caschools.predict(pd.Series([40, 40 ** 2])))[0]
+    actual_y_hat_diff = (model_caschools.predict(np.array([[41, 41 ** 2]])) -
+                         model_caschools.predict(np.array([[40, 40 ** 2]])))[0]
     assert np.round(actual_y_hat_diff, 4) == expected_y_hat_diff
 
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         model_caschools.predict(pd.Series([41]))
+    with pytest.raises(ValueError):
+        model_caschools.predict(np.array([[41]]))
