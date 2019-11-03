@@ -16,6 +16,7 @@ def df_cars93():
     return df
 
 
+@pytest.mark.remote_data
 def test_bad_arguments(df_cars93):
     with pytest.raises(ValueError):
         DummyEncoder(df_cars93, {'drivetrain': '4WD'}, separator='#')
@@ -23,6 +24,7 @@ def test_bad_arguments(df_cars93):
         DummyEncoder(df_cars93, {'drivetrain': '4WD'}, nan_policy='naan_bread')
 
 
+@pytest.mark.remote_data
 def test_row_of_zero(df_cars93):
     df = df_cars93.copy()
 
@@ -47,6 +49,7 @@ def test_row_of_zero(df_cars93):
     assert df[expected_new_cols].isna().sum().sum() == 0
 
 
+@pytest.mark.remote_data
 def test_dummy_for_nan(df_cars93):
     df = df_cars93.copy()
     df.loc[0, 'drivetrain'] = np.NaN
@@ -75,6 +78,7 @@ def test_dummy_for_nan(df_cars93):
     assert no_nan_df[expected_new_cols].isna().sum().sum() == 0
 
 
+@pytest.mark.remote_data
 def test_row_of_nan(df_cars93):
     df = df_cars93.copy()
     df.loc[0, 'drivetrain'] = np.NaN

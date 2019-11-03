@@ -39,6 +39,7 @@ def df_birthwt():
     return df
 
 
+@pytest.mark.remote_data
 def test_cont_cont_encoding(df_wells):
     # Interaction feature
     intn_encoder = InteractionEncoder(df_wells,
@@ -55,6 +56,7 @@ def test_cont_cont_encoding(df_wells):
     assert pd.api.types.is_float_dtype(df_test['distance#arsenic'])
 
 
+@pytest.mark.remote_data
 def test_bool_bool_encoding(df_caschools):
     df_test = df_caschools.copy()
     df_test['hi_str'] = np.where(df_test['str'] >= 20, 1, 0)
@@ -74,6 +76,7 @@ def test_bool_bool_encoding(df_caschools):
     assert pd.api.types.is_integer_dtype(df_test['hi_str#hi_elpct'])
 
 
+@pytest.mark.remote_data
 def test_bool_cont_encoding(df_caschools):
     df_test = df_caschools.copy()
     df_test['hi_elpct'] = np.where(df_test['elpct'] >= 10, 1, 0)
@@ -104,6 +107,7 @@ def test_bool_cont_encoding(df_caschools):
     assert pd.api.types.is_float_dtype(df_test['hi_elpct#str'])
 
 
+@pytest.mark.remote_data
 def test_cat_cont_encoding(df_birthwt):
     # Interaction feature (cat, cont)
     intn_encoder = InteractionEncoder(df_birthwt,
@@ -138,6 +142,7 @@ def test_cat_cont_encoding(df_birthwt):
         assert pd.api.types.is_integer_dtype(df_test[col])
 
 
+@pytest.mark.remote_data
 def test_cat_bool_encoding(df_birthwt):
     # Interaction feature (cat, bool)
     intn_encoder = InteractionEncoder(df_birthwt,
@@ -172,6 +177,7 @@ def test_cat_bool_encoding(df_birthwt):
         assert pd.api.types.is_integer_dtype(df_test[col])
 
 
+@pytest.mark.remote_data
 def test_cat_cat_encoding(df_birthwt):
     df_test = df_birthwt.copy()
     # ptl is discrete var with vals [0, 1, 2, 3]: make it a category
@@ -202,6 +208,7 @@ def test_cat_cat_encoding(df_birthwt):
         get_dataframe_columns_diff('string', df_birthwt)
 
 
+@pytest.mark.remote_data
 def test_model_wells(df_wells):
     df_test = df_wells.copy()
     df_test['distance100'] = df_test['distance'] / 100

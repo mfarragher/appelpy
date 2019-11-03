@@ -15,6 +15,7 @@ def df_cars93(scope='module'):
     return df
 
 
+@pytest.mark.remote_data
 def test_nan_values(df_cars93):
     df = df_cars93.copy()
 
@@ -32,6 +33,7 @@ def test_nan_values(df_cars93):
         model.fit(printing=False)
 
 
+@pytest.mark.remote_data
 def test_inf_values(df_cars93):
     df = df_cars93.copy()
 
@@ -49,6 +51,7 @@ def test_inf_values(df_cars93):
         model.fit(printing=False)
 
 
+@pytest.mark.remote_data
 def test_string_values(df_cars93):
     # x var
     with pytest.raises(TypeError, match=r'.*string*.'):
@@ -63,6 +66,7 @@ def test_string_values(df_cars93):
         model.fit(printing=False)
 
 
+@pytest.mark.remote_data
 def test_category_values(df_cars93):
     df = df_cars93.copy()
     df['type'] = df['type'].astype('category')

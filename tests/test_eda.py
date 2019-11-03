@@ -15,6 +15,7 @@ def df_caschool():
     return df
 
 
+@pytest.mark.remote_data
 def test_statistical_moments(df_caschool):
     moments = statistical_moments(df_caschool, kurtosis_fisher=False)
     moments_default = statistical_moments(df_caschool)
@@ -54,6 +55,7 @@ def test_statistical_moments(df_caschool):
                         check_dtype=False)
 
 
+@pytest.mark.remote_data
 def test_correlation_heatmap(df_caschool):
     # Close open figures at start of new test
     plt.cla()
