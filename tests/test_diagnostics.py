@@ -8,8 +8,17 @@ from pandas.util.testing import (assert_series_equal, assert_frame_equal,
                                  assert_numpy_array_equal)
 from appelpy.diagnostics import (variance_inflation_factors, BadApples,
                                  heteroskedasticity_test,
-                                 partial_regression_plot)
+                                 partial_regression_plot, pp_plot, qq_plot,
+                                 plot_residuals_vs_predicted_values,
+                                 plot_residuals_vs_fitted_values)
 from appelpy.linear_model import OLS
+import matplotlib
+
+
+def _reset_matplotlib():
+    # Close open figures at start of new test
+    plt.cla()
+    plt.close('all')
 
 
 @pytest.fixture(scope='module')
@@ -68,6 +77,7 @@ def bad_apples_hills():
     return bad_apples
 
 
+@pytest.mark.remote_data
 def test_model_not_fitted():
     df = sm.datasets.get_rdataset('cars').data
     X_list = ['speed']
@@ -77,8 +87,11 @@ def test_model_not_fitted():
 
     with pytest.raises(ValueError):
         BadApples(model).fit()
+    with pytest.raises(ValueError):
+        model.diagnostic_plot('pp_plot')
 
 
+@pytest.mark.remote_data
 def test_variance_inflation_factors(model_mtcars_long):
     expected_vif = pd.Series({'cyl': 15.373833,
                               'disp': 21.620241,
@@ -94,6 +107,7 @@ def test_variance_inflation_factors(model_mtcars_long):
     assert_series_equal(df_vif['VIF'].round(6), expected_vif)
 
 
+@pytest.mark.remote_data
 def test_bad_apple_prints(capsys):
     df = sm.datasets.get_rdataset('hills', 'MASS').data
 
@@ -106,6 +120,7 @@ def test_bad_apple_prints(capsys):
     assert captured.out == expected_print
 
 
+@pytest.mark.remote_data
 def test_influence(bad_apples_hills):
     indices = ['Greenmantle', 'Carnethy', 'Craig Dunain', 'Ben Rha', 'Ben Lomond',
                'Goatfell', 'Bens of Jura', 'Cairnpapple', 'Scolty', 'Traprain',
@@ -195,6 +210,7 @@ def test_influence(bad_apples_hills):
                 set(extremes_df.index.tolist())))
 
 
+@pytest.mark.remote_data
 def test_leverage(bad_apples_hills):
     indices = ['Greenmantle', 'Carnethy', 'Craig Dunain', 'Ben Rha', 'Ben Lomond',
                'Goatfell', 'Bens of Jura', 'Cairnpapple', 'Scolty', 'Traprain',
@@ -223,6 +239,7 @@ def test_leverage(bad_apples_hills):
                 set(bad_apples_hills.indices_high_leverage)))
 
 
+@pytest.mark.remote_data
 def test_outliers(bad_apples_hills):
     assert (bad_apples_hills.measures_outliers
             ['resid_studentized'].idxmax() == 'Knock Hill')
@@ -231,7 +248,8 @@ def test_outliers(bad_apples_hills):
 
     expected_max_resid_student = 7.610845
     assert(np.round(bad_apples_hills.measures_outliers
-                    ['resid_studentized'].max(), 6) == expected_max_resid_student)
+                    ['resid_studentized'].max(), 6)
+           == expected_max_resid_student)
 
     # Measurement error - expected outlier
     assert (set({'Knock Hill'})
@@ -239,6 +257,7 @@ def test_outliers(bad_apples_hills):
                 set(bad_apples_hills.indices_outliers)))
 
 
+@pytest.mark.remote_data
 def test_heteroskedasticity_diagnostics(model_cars, model_journals):
     # Check for invalid arguments first:
     with pytest.raises(ValueError):
@@ -300,14 +319,9 @@ def test_heteroskedasticity_diagnostics(model_cars, model_journals):
     assert (np.round(pval, 3) == expected_pval)
 
 
+@pytest.mark.remote_data
 def test_rvf_plot(model_mtcars_short):
-    # Close open figures at start of new test
-    plt.cla()
-    plt.close('all')
-
-    fig = model_mtcars_short.diagnostic_plot('rvf_plot')
-    assert isinstance(fig, matplotlib.figure.Figure)
-
+    _reset_matplotlib()
     # Expected data, with x-vals sorted in asc order
     sorted_expected_data = (
         np.array([[10.4, 10.4, 13.3, 14.3, 14.7, 15.,
@@ -323,26 +337,33 @@ def test_rvf_plot(model_mtcars_short):
                    -3.54021,  0.93363, -1.08655, -0.22323,  1.2222,  1.73801,
                    5.84247,  6.07224]])).T
 
+    # ax=None
+    _reset_matplotlib()
+    fig = plot_residuals_vs_fitted_values(model_mtcars_short.y,
+                                          model_mtcars_short.resid, ax=None)
+    assert isinstance(fig, matplotlib.figure.Figure)
     # Actual data:
     actual_data = fig.get_axes()[0].collections[0].get_offsets().data
     sorted_actual_data = actual_data[actual_data[:, 0].argsort()]
+    assert_numpy_array_equal(np.round(sorted_actual_data, 5),
+                             sorted_expected_data)
 
+    # Ax specified
+    _reset_matplotlib()
+    fig, ax = plt.subplots(figsize=(8, 5))
+    model_mtcars_short.diagnostic_plot('rvf_plot', ax=ax)
+    assert isinstance(fig, matplotlib.figure.Figure)
+
+    # Actual data:
+    actual_data = fig.get_axes()[0].collections[0].get_offsets().data
+    sorted_actual_data = actual_data[actual_data[:, 0].argsort()]
     assert_numpy_array_equal(np.round(sorted_actual_data, 5),
                              sorted_expected_data)
 
 
+@pytest.mark.remote_data
 def test_rvp_plot(model_mtcars_short):
-    # Close open figures at start of new test
-    plt.cla()
-    plt.close('all')
-
-    with pytest.raises(ValueError):
-        model_mtcars_short.diagnostic_plot('rvpplot')
-
-    plt.cla()
-    plt.close('all')
-    fig = model_mtcars_short.diagnostic_plot('rvp_plot')
-    assert isinstance(fig, matplotlib.figure.Figure)
+    _reset_matplotlib()
 
     # Expected data, with x-vals sorted in asc order
     sorted_expected_data = (
@@ -359,18 +380,36 @@ def test_rvp_plot(model_mtcars_short):
                    -4.40346, -3.54021,  5.84247, -1.08655, -0.22323,  6.07224,
                    1.73801,  1.2222]])).T
 
+    with pytest.raises(ValueError):
+        model_mtcars_short.diagnostic_plot('rvpplot')
+
+    # Ax=None:
+    _reset_matplotlib()
+    fig = plot_residuals_vs_predicted_values(
+        model_mtcars_short.predict(model_mtcars_short.X.to_numpy()),
+        model_mtcars_short.results.resid, ax=None)
+    assert isinstance(fig, matplotlib.figure.Figure)
     # Actual data:
     actual_data = fig.get_axes()[0].collections[0].get_offsets().data
     sorted_actual_data = actual_data[actual_data[:, 0].argsort()]
+    assert_numpy_array_equal(np.round(sorted_actual_data, 5),
+                             sorted_expected_data)
 
+    # Ax specified
+    _reset_matplotlib()
+    fig, ax = plt.subplots(figsize=(8, 5))
+    model_mtcars_short.diagnostic_plot('rvp_plot', ax=ax)
+    assert isinstance(fig, matplotlib.figure.Figure)
+    # Actual data:
+    actual_data = fig.get_axes()[0].collections[0].get_offsets().data
+    sorted_actual_data = actual_data[actual_data[:, 0].argsort()]
     assert_numpy_array_equal(np.round(sorted_actual_data, 5),
                              sorted_expected_data)
 
 
+@pytest.mark.remote_data
 def test_lrv2_plot(model_mtcars_short):
-    # Close open figures at start of new test
-    plt.cla()
-    plt.close('all')
+    _reset_matplotlib()
 
     # Expected data
     leverage_vals = np.array([0.07142759, 0.07682215, 0.08269091, 0.05674927, 0.1408117,
@@ -396,26 +435,35 @@ def test_lrv2_plot(model_mtcars_short):
     bad_apples = BadApples(model_mtcars_short).fit()
     assert_series_equal(bad_apples.y, model_mtcars_short.y)
     assert_frame_equal(bad_apples.X, model_mtcars_short.X)
-    # 1) default method call
-    fig = bad_apples.plot_leverage_vs_residuals_squared()
-    assert isinstance(fig, matplotlib.figure.Figure)
 
+    # 1a) default method call - ax=None
+    _reset_matplotlib()
+    fig = bad_apples.plot_leverage_vs_residuals_squared(ax=None)
+    assert isinstance(fig, matplotlib.figure.Figure)
     actual_data = fig.get_axes()[0].collections[0].get_offsets().data
     sorted_actual_data = actual_data[actual_data[:, 0].argsort()]
+    assert_numpy_array_equal(np.round(sorted_actual_data, 5),
+                             np.round(sorted_expected_data, 5))
 
+    # 1b) default method call - ax specified
+    _reset_matplotlib()
+    fig, ax = plt.subplots(figsize=(8, 5))
+    bad_apples.plot_leverage_vs_residuals_squared(ax=ax)
+    assert isinstance(fig, matplotlib.figure.Figure)
+    actual_data = fig.get_axes()[0].collections[0].get_offsets().data
+    sorted_actual_data = actual_data[actual_data[:, 0].argsort()]
     assert_numpy_array_equal(np.round(sorted_actual_data, 5),
                              np.round(sorted_expected_data, 5))
 
     # 2) rescale=True
-    plt.cla()
-    plt.close('all')
-    fig = bad_apples.plot_leverage_vs_residuals_squared(rescale=True)
+    _reset_matplotlib()
+    fig = bad_apples.plot_leverage_vs_residuals_squared(rescale=True, ax=None)
     assert isinstance(fig, matplotlib.figure.Figure)
 
     obs = len(model_mtcars_short.X)
 
     expected_data = np.column_stack((np.divide(resid_sq_vals, obs),
-                                     leverage_vals))
+                                    leverage_vals))
     sorted_expected_data = expected_data[expected_data[:, 0].argsort()]
 
     actual_data = fig.get_axes()[0].collections[0].get_offsets().data
@@ -425,14 +473,11 @@ def test_lrv2_plot(model_mtcars_short):
                              np.round(sorted_expected_data, 5))
 
     # 3) annotate=True
-    plt.cla()
-    plt.close('all')
-    fig = bad_apples.plot_leverage_vs_residuals_squared(annotate=True)
+    _reset_matplotlib()
+    fig = bad_apples.plot_leverage_vs_residuals_squared(annotate=True, ax=None)
     assert isinstance(fig, matplotlib.figure.Figure)
-
     expected_data = np.column_stack((resid_sq_vals, leverage_vals))
     sorted_expected_data = expected_data[expected_data[:, 0].argsort()]
-
     actual_data = fig.get_axes()[0].collections[0].get_offsets().data
     sorted_actual_data = actual_data[actual_data[:, 0].argsort()]
 
@@ -442,11 +487,9 @@ def test_lrv2_plot(model_mtcars_short):
     assert(len(annotations) == 20)
 
 
+@pytest.mark.remote_data
 def test_partial_regression_plot(df_prestige):
-    # Close open figures at start of new test
-    plt.cla()
-    plt.close('all')
-
+    _reset_matplotlib()
     model_wo_women = OLS(df_prestige,
                          ['prestige'],
                          ['education', 'log2_income'])
@@ -491,8 +534,18 @@ def test_partial_regression_plot(df_prestige):
                    1.47855,  16.2411,  -0.93693,  13.53354,  -0.15396,   6.88775]])
     ).T
 
-    # model_wo_women
-    fig = partial_regression_plot(model_wo_women, df_prestige, 'women')
+    # model_wo_women - ax=None
+    fig = partial_regression_plot(model_wo_women, df_prestige, 'women', ax=None)
+    assert isinstance(fig, matplotlib.figure.Figure)
+    actual_data = fig.get_axes()[0].collections[0].get_offsets().data
+    sorted_actual_data = actual_data[actual_data[:, 0].argsort()]
+    assert_numpy_array_equal(np.round(sorted_actual_data, 5),
+                             sorted_expected_data)
+
+    # model_wo_women - ax specified
+    _reset_matplotlib()
+    fig, ax = plt.subplots(figsize=(8, 5))
+    partial_regression_plot(model_wo_women, df_prestige, 'women', ax=ax)
     assert isinstance(fig, matplotlib.figure.Figure)
     actual_data = fig.get_axes()[0].collections[0].get_offsets().data
     sorted_actual_data = actual_data[actual_data[:, 0].argsort()]
@@ -500,9 +553,8 @@ def test_partial_regression_plot(df_prestige):
                              sorted_expected_data)
 
     # model_w_women
-    plt.cla()
-    plt.close('all')
-    fig = partial_regression_plot(model_w_women, df_prestige, 'women')
+    _reset_matplotlib()
+    fig = partial_regression_plot(model_w_women, df_prestige, 'women', ax=None)
     assert isinstance(fig, matplotlib.figure.Figure)
     actual_data = fig.get_axes()[0].collections[0].get_offsets().data
     sorted_actual_data = actual_data[actual_data[:, 0].argsort()]
@@ -510,39 +562,51 @@ def test_partial_regression_plot(df_prestige):
                              sorted_expected_data)
 
     # Error: added variable not in df:
-    plt.cla()
-    plt.close('all')
     with pytest.raises(ValueError):
         partial_regression_plot(model_wo_women, df_prestige, 'men')
 
     # Error: NaN value in added variable col:
-    plt.cla()
-    plt.close('all')
     with pytest.raises(ValueError):
         error_df = df_prestige.copy()
         error_df.loc[0, 'women'] = np.NaN
         partial_regression_plot(model_wo_women, error_df, 'women')
 
 
+@pytest.mark.remote_data
 def test_qq_plot(model_mtcars_short):
-    # Close open figures at start of new test
-    plt.cla()
-    plt.close('all')
-    fig = model_mtcars_short.diagnostic_plot('qq_plot')
-    assert isinstance(fig, matplotlib.figure.Figure)
+    _reset_matplotlib()
 
-    ax = model_mtcars_short.diagnostic_plot('qq_plot').get_axes()[0]
+    # ax=None
+    fig = qq_plot(model_mtcars_short.resid, ax=None)
+    assert isinstance(fig, matplotlib.figure.Figure)
+    ax = fig.get_axes()[0]
+    assert(ax.get_xlabel() == 'Theoretical Quantiles')
+    assert(ax.get_ylabel() == 'Sample Quantiles')
+
+    # Ax specified
+    _reset_matplotlib()
+    fig, ax = plt.subplots(figsize=(8, 5))
+    model_mtcars_short.diagnostic_plot('qq_plot', ax=ax)
+    assert isinstance(fig, matplotlib.figure.Figure)
     assert(ax.get_xlabel() == 'Theoretical Quantiles')
     assert(ax.get_ylabel() == 'Sample Quantiles')
 
 
+@pytest.mark.remote_data
 def test_pp_plot(model_mtcars_short):
-    # Close open figures at start of new test
-    plt.cla()
-    plt.close('all')
-    fig = model_mtcars_short.diagnostic_plot('pp_plot')
-    assert isinstance(fig, matplotlib.figure.Figure)
+    _reset_matplotlib()
 
-    ax = model_mtcars_short.diagnostic_plot('pp_plot').get_axes()[0]
+    # ax=None
+    fig = pp_plot(model_mtcars_short.resid, ax=None)
+    assert isinstance(fig, matplotlib.figure.Figure)
+    ax = fig.get_axes()[0]
+    assert(ax.get_xlabel() == 'Theoretical Probabilities')
+    assert(ax.get_ylabel() == 'Sample Probabilities')
+
+    # Ax specified
+    _reset_matplotlib()
+    fig, ax = plt.subplots(figsize=(8, 5))
+    model_mtcars_short.diagnostic_plot('pp_plot', ax=ax)
+    assert isinstance(fig, matplotlib.figure.Figure)
     assert(ax.get_xlabel() == 'Theoretical Probabilities')
     assert(ax.get_ylabel() == 'Sample Probabilities')
