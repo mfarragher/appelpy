@@ -582,11 +582,6 @@ def heteroskedasticity_test(test_name, appelpy_model_object,
         test_statistic, p_value: the test statistic and the corresponding
             p-value.
     """
-    if test_name not in ['breusch_pagan', 'breusch_pagan_studentized',
-                         'white']:
-        raise ValueError(
-            """Choose one of 'breusch_pagan', 'breusch_pagan_studentized' or
-            'white' as a test name.""")
 
     if test_name == 'breusch_pagan':
         # Get residuals (from model object or run again on a regressors subset)
@@ -612,8 +607,7 @@ def heteroskedasticity_test(test_name, appelpy_model_object,
         lm = aux_model.ess / 2
         pval = sp.stats.chi2.sf(lm, 1)  # dof=1
         return lm, pval
-
-    if test_name == 'breusch_pagan_studentized':
+    elif test_name == 'breusch_pagan_studentized':
         if regressors_subset:
             if not set(regressors_subset).issubset(set(appelpy_model_object.X.columns)):
                 raise ValueError(
@@ -628,10 +622,13 @@ def heteroskedasticity_test(test_name, appelpy_model_object,
             lm, pval, _, _ = sms.het_breuschpagan(appelpy_model_object.results.resid,
                                                   appelpy_model_object.results.model.exog)
             return lm, pval
-
-    if test_name == 'white':
+    elif test_name == 'white':
         if regressors_subset:
             print("Ignoring regressors_subset.  White test will use original regressors.")
         white_test = sms.het_white(appelpy_model_object.resid,
                                    sm.add_constant(appelpy_model_object.X))
         return white_test[0], white_test[1]  # lm, pval
+    else:
+        raise ValueError(
+            """Choose one of 'breusch_pagan', 'breusch_pagan_studentized' or
+            'white' as a test name.""")
