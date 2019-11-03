@@ -1,0 +1,6 @@
+pytest
+pytest-cov
+pytest-remotedata
+coverage
+codecov
+tox
