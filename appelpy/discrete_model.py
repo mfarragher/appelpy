@@ -71,7 +71,7 @@ class Logit:
         self._y = df[y_name]  # Pandas Series
         if len(regressors_list) == 1:
             [x_name] = regressors_list
-            self._X = df[x_name]  # Pandas Series
+            self._X = df[x_name].to_frame()  # Pandas dataframe
         else:
             self._X = df[regressors_list]  # Pandas dataframe
         self._alpha = alpha
@@ -304,7 +304,8 @@ class Logit:
                 the sample.
 
         Args:
-            X_predict (array-like object): values of the regressors
+            X_predict (Numpy array): values of the regressors, with shape
+                (# examples, # regressors)
             within_sample (bool, optional): Defaults to True.  If a regressor
                 has a value outside of the data used to fit the data, then
                 NaN value is predicted.
@@ -324,15 +325,10 @@ class Logit:
         regressors_count = self._X.shape[1]
 
         if type(X_predict) != np.ndarray:
-            X_predict = X_predict.to_numpy()
-        # From this point, X_predict must be a Numpy array.
-        if X_predict.ndim == 1:
-            X_predict = X_predict.T
-            examples_to_predict = 1
-            regressors_detected = len(X_predict)
-        else:
-            examples_to_predict = X_predict.shape[0]
-            regressors_detected = X_predict.shape[1]
+            raise TypeError(
+                "Pass X_predict as Numpy array with shape (# examples, # regressors).")
+        examples_to_predict = X_predict.shape[0]
+        regressors_detected = X_predict.shape[1]
 
         if regressors_detected != regressors_count:
             raise ValueError(
@@ -343,32 +339,22 @@ class Logit:
             # ^ Error suppressed for cases where X_predict contains NaN
             # If there is a NaN, then the Numpy comparison still leads
             # to a NaN prediction
-            if within_sample and X_predict.ndim == 1:
-                # Series of truth for whether each val is in range
-                vals_in_range = ((self._X.min() <= X_predict)
-                                 & (X_predict <= self._X.max()))
-                # Series of truth for whether each observation has
-                # all X vals in range
-                all_vals_in_range = vals_in_range.all(axis=0)
-                # Add constant into prediction
-                # Make X_predict have shape ( , # regressors + 1)
-                X_predict = np.insert(X_predict, 0, 1)
-            else:
-                # Truth array `vals_in_range` shape (# examples, # regressors)
-                vals_in_range_min = np.less_equal(np.tile(self._X.min().T,
-                                                          (examples_to_predict, 1)),
-                                                  X_predict)
-                vals_in_range_max = np.greater_equal(X_predict,
-                                                     np.tile(self._X.min().T,
-                                                             (examples_to_predict, 1)))
-                vals_in_range = vals_in_range_min & vals_in_range_max
-                # Truth array - shape (# examples, )
-                # for whether each observation has all X vals in range
-                all_vals_in_range = vals_in_range.all(axis=1)
+            # Truth array `vals_in_range` shape (# examples, # regressors)
+            vals_in_range_min = np.less_equal(np.tile(self._X.min().T,
+                                                      (examples_to_predict, 1)),
+                                              X_predict)
+            vals_in_range_max = np.greater_equal(X_predict,
+                                                 np.tile(self._X.min().T,
+                                                         (examples_to_predict, 1)))
+            vals_in_range = vals_in_range_min & vals_in_range_max
+            # Truth array - shape (# examples, )
+            # for whether each observation has all X vals in range
+            all_vals_in_range = vals_in_range.all(axis=1)
 
-                # Add constant into prediction
-                # Make X_predict have shape (# examples, # regressors + 1)
-                X_predict = sm.add_constant(X_predict)
+            # Add constant into prediction
+            # Make X_predict have shape (# examples, # regressors + 1)
+            X_predict = np.concatenate([np.ones((examples_to_predict, 1)),
+                                        X_predict], axis=1)
 
         # Statsmodels predict takes arg w/ shape (# examples, # regressors + 1)
         preds = self._results.predict(exog=X_predict)
