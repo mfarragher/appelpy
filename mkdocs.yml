@@ -1,0 +1,17 @@
+site_name: appelpy
+repo_url: https://github.com/mfarragher/appelpy
+
+theme:
+    name: readthedocs
+
+nav:
+    - Home: index.md
+    - Reference:
+        - eda: reference/eda.md
+        - utils: reference/utils.md
+        - linear_model: reference/linear-model.md
+        - discrete_model: reference/discrete-model.md
+        - diagnostics: reference/diagnostics.md
+
+markdown_extensions:
+    - admonition
