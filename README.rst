@@ -4,6 +4,9 @@
 .. image:: https://img.shields.io/pypi/pyversions/appelpy.svg
     :target: https://pypi.org/project/appelpy/
 
+.. image:: https://readthedocs.org/projects/appelpy/badge/?version=latest
+    :target: https://appelpy.readthedocs.io/
+
 .. image:: https://img.shields.io/badge/License-BSD%203--Clause-blue.svg
     :target: https://github.com/mfarragher/appelpy/blob/master/LICENSE.txt
 
@@ -12,6 +15,12 @@
 
 .. image:: https://codecov.io/gh/mfarragher/appelpy/branch/master/graph/badge.svg
     :target: https://codecov.io/gh/mfarragher/appelpy
+
+.. |binder10| image:: https://mybinder.org/badge_logo.svg
+.. _binder10: https://mybinder.org/v2/gh/mfarragher/appelpy-examples/master?filepath=00_ten-minutes-to-appelpy.ipynb
+
+.. |nbviewer10| image:: https://img.shields.io/badge/render-nbviewer-orange.svg
+.. _nbviewer10: https://nbviewer.jupyter.org/github/mfarragher/appelpy-examples/blob/master/00_ten-minutes-to-appelpy.ipynb
 
 ===================================================
 appelpy: Applied Econometrics Library for Python
@@ -26,9 +35,14 @@ Econometric modelling and general regression analysis in Python have never been 
 
 The library builds upon the functionality of the 'vanilla' Python data stack (e.g. Pandas, Numpy, etc.) and other libraries such as Statsmodels.
 
-See the `appelpy-examples <https://github.com/mfarragher/appelpy-examples>`_ Github repo for more detailed **documentation and notebooks** that show the functionality of the library.
+Documentation
+==========================
+See the functionality of the library at https://appelpy.readthedocs.io/
 
-In particular see the `10 Minutes to Appelpy <https://github.com/mfarragher/appelpy-examples/blob/master/00_ten-minutes-to-appelpy.ipynb>`_ notebook for a whirlwind tour of the library's functionality on the California Test Score (Caschool) dataset.
+Get started with the *10 Minutes to Appelpy* tutorial:
+
+- |binder10|_: interactive experience of the *10 Minutes to Appelpy* tutorial via Binder.
+- |nbviewer10|_: static render of the *10 Minutes to Appelpy* notebook.
 
 🥧 Why it's as easy as pie
 ==========================
