@@ -69,4 +69,4 @@ model_nonrobust.diagnostic_plot('rvf_plot', ax=axarr[1][1])
 plt.tight_layout()
 ```
 
-![OLS diagnostics plot](/img/2x2-diagnostics-ols.png)
+![OLS diagnostics plot](../img/2x2-diagnostics-ols.png)
