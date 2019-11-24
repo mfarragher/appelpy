@@ -22,25 +22,38 @@ pip install appelpy
 
 Supported for Python 3.6 and higher versions.
 
-# Basic usage
-It only takes one line of code to fit a basic linear model of 'y on X' and another line to return the model's results.
+# Why Appelpy?
+## Basic usage
+It only takes **one line of code** to fit a basic linear model of 'y on X' and another line to return the model's results.
 
 ```python
 from appelpy.linear_model import OLS
 
 model1 = OLS(df, y_list, X_list).fit()  # y_list & X_list contain df columns
-model1.results_output  # returns summary results
+model1.results_output  # returns (Statsmodels) summary results
 ```
 
-Model objects have many useful attributes, e.g. the inputs X & y, standardized X and y values, results of fitted models (incl. standardized estimates).  The library also has diagnostic classes and functions that consume model objects (or else their underlying data).
+Model objects have many useful attributes, e.g. the inputs X & y, standardized X and y values, results of fitted models (incl. standardized estimates).  The library also has **diagnostic classes and functions** that consume model objects (or else their underlying data).
 
-These are more things that can be obtained via one line of code:
+These are more things that can be obtained via **one line of code:**
 
 * *Diagnostics* can be called from the object: e.g. produce a P-P plot via `model1.diagnostic_plot('pp_plot')`
 * *Model selection statistics*: e.g. find the root mean square error of the model from `model1.model_selection_stats`
 * *Standardized model estimates*: `model1.results_output_standardized`
 
 Classes in the library have a fluent interface, so that they can be instantiated and have chained methods in one line of code.
+
+## Features that add value to model workflows in Python
+See Appelpy's **[key features](intro/key-features.md)** (with images), which add _so much more_ to the vanilla Python data stack, e.g.:
+
+- Fluent interface and API design make it easier to build pipelines for modelling & data pre-processing.
+- More accessible interface for Stata users, while utilising the benefits of object-orientated programming.
+- One method for calling **diagnostic plots** to assess whether OLS assumptions hold in a model.
+- **Useful encoders** for transforming datasets, e.g. `DummyEncoder` and `InteractionEncoder`.
+- Standardized model estimates (Beta coefficients).
+- Decomposition of influence analysis into three parts: leverage, outlier and influence measures.
+- Identify extreme observations in a model based on common heuristics.
+- **Perform diagnostics not implemented in the main Python libraries**, e.g. studentized Breusch–Pagan test of heteroskedasticity.
 
 # Modules
 ## Exploration and pre-processing
