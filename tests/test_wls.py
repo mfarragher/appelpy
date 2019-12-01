@@ -97,6 +97,7 @@ def test_standard_errors(model_salaries):
                         expected_se)
 
     assert(model_salaries.cov_type == 'nonrobust')
+    assert(model_salaries.cov_options == {})
 
 
 @pytest.mark.remote_data

@@ -4,6 +4,7 @@ import statsmodels.api as sm
 import pandas as pd
 import numpy as np
 from pandas.util.testing import (assert_series_equal,
+                                 assert_frame_equal,
                                  assert_numpy_array_equal)
 from appelpy.discrete_model import Logit
 from appelpy.utils import DummyEncoder
@@ -70,6 +71,7 @@ def test_model_not_fitted():
         model.significant_regressors(0.05)
     with pytest.raises(ValueError):
         model.predict(model.X.mean())
+    assert_frame_equal(df, model.df)
 
 
 @pytest.mark.remote_data

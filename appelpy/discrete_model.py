@@ -61,6 +61,7 @@ class Logit:
         is_fitted (Boolean): indicator for whether the model has been fitted.
 
     Attributes (auxiliary - used to store arguments):
+        df
         alpha
     """
 
@@ -68,6 +69,7 @@ class Logit:
                  alpha=0.05, printing=True):
         """Initializes the Logit model object."""
         # Model inputs (attributes from arguments):
+        self._df = df
         [y_name] = y_list  # sequence unpacking in order to make Series
         self._y = df[y_name]  # Pandas Series
         if len(regressors_list) == 1:
@@ -80,6 +82,11 @@ class Logit:
 
     # MODEL INPUTS
     # These should be immutable
+    @property
+    def df(self):
+        """pd.DataFrame: source dataset"""
+        return self._df
+
     @property
     def y(self):
         """pd.Series: endogenous / dependent variable"""

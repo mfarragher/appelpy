@@ -4,6 +4,7 @@ import numpy as np
 import statsmodels
 import statsmodels.api as sm
 from pandas.util.testing import (assert_series_equal,
+                                 assert_frame_equal,
                                  assert_numpy_array_equal)
 from appelpy.utils import DummyEncoder
 from appelpy.linear_model import OLS
@@ -138,6 +139,7 @@ def test_standard_errors(model_mtcars_final):
                         expected_se)
 
     assert(model_mtcars_final.cov_type == 'nonrobust')
+    assert(model_mtcars_final.cov_options == {})
 
 
 @pytest.mark.remote_data
@@ -266,3 +268,63 @@ def test_predictions(model_caschools):
         model_caschools.predict(pd.Series([41]))
     with pytest.raises(ValueError):
         model_caschools.predict(np.array([[41]]))
+
+
+@pytest.mark.remote_data
+def test_clustered_standard_errors():
+    # Pooled OLS - Fatality dataset
+    df = sm.datasets.get_rdataset('Fatality', 'Ecdat').data
+
+    y_list, X_list = ['mrall'], ['beertax']
+    model = OLS(df, y_list, X_list,
+                cov_type='cluster',
+                cov_options={'groups': ['state']}
+                ).fit()
+
+    expected_se = pd.Series({'const': 0.1185192,
+                             'beertax': 0.119686})
+    assert_series_equal(model.results.bse.round(4),
+                        expected_se.round(4))
+
+    assert(model.cov_type == 'cluster')
+    assert(model.cov_options == {'groups': ['state']})
+    assert_frame_equal(df, model.df)
+
+
+@pytest.mark.remote_data
+def test_driscoll_kraay_standard_errors():
+    df = sm.datasets.get_rdataset('PetersenCL', 'sandwich').data
+
+    # Compare examples from R docs for vcovPL function (sandwich package)
+    # (T-1 lags = 9, no correction):
+    model_1 = OLS(df, ['y'], ['x'],
+                  cov_type='hac-groupsum',
+                  cov_options={'time': ['year'],
+                               'maxlags': 9,
+                               'use_correction': False}).fit()
+    expected_1_se = pd.Series({'const': 0.01618977,
+                               'x': 0.01426121})
+    assert_series_equal(model_1.results.bse.round(4),
+                        expected_1_se.round(4))
+
+    # (2 lags, HAC correction):
+    model_2 = OLS(df, ['y'], ['x'],
+                  cov_type='hac-groupsum',
+                  cov_options={'time': ['year'],
+                               'maxlags': 2,
+                               'use_correction': 'hac'}).fit()
+    expected_2_se = pd.Series({'const': 0.02289115,
+                               'x': 0.02441980})
+    assert_series_equal(model_2.results.bse.round(4),
+                        expected_2_se.round(4))
+
+    # (1 lag, HAC correction):
+    model_3 = OLS(df, ['y'], ['x'],
+                  cov_type='hac-groupsum',
+                  cov_options={'time': ['year'],
+                               'maxlags': 1,
+                               'use_correction': 'hac'}).fit()
+    expected_3_se = pd.Series({'const': 0.02436219,
+                               'x': 0.02816896})
+    assert_series_equal(model_3.results.bse.round(4),
+                        expected_3_se.round(4))

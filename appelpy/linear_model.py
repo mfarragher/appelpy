@@ -43,6 +43,13 @@ class WLS:
             - 'HC3': robust standard errors obtained via HCCM estimates.
                 Recommended by by Long & Ervin (1999) where number of
                 observations < 250.
+        cov_options (dict, optional): Specify keyword arguments for cov_type.
+            This is a wrapper around the cov_kwds parameter in Statsmodels,
+            although column lists are used for dict values instead of Pandas
+            objects.
+            e.g. when specifying a group 'state' for clustered standard errors,
+            the form is cov_options={'groups': 'state'},
+            instead of cov_kwds={'groups': df['state']}.
         alpha (float, optional): Defaults to 0.05.  The significance level
             used for reporting confidence intervals in the model summary.
 
@@ -81,15 +88,18 @@ class WLS:
         is_fitted (Boolean): indicator for whether the model has been fitted.
 
     Attributes (auxiliary - used to store arguments):
+        df
         cov_type
+        cov_options
         w
         alpha
     """
 
     def __init__(self, df, y_list, regressors_list, *, w=None,
-                 cov_type='nonrobust', alpha=0.05):
+                 cov_type='nonrobust', cov_options=None, alpha=0.05):
         """Initializes the WLS model object."""
         # Model inputs (attributes from arguments):
+        self._df = df
         [y_name] = y_list  # sequence unpacking in order to make Series
         self._y = df[y_name]  # Pandas Series
         if len(regressors_list) == 1:
@@ -98,6 +108,7 @@ class WLS:
         else:
             self._X = df[regressors_list]  # Pandas dataframe
         self._cov_type = cov_type
+        self._cov_options = cov_options if cov_options else {}
         if w is None:
             self._w = pd.Series(np.ones(len(self._X)))
         else:
@@ -107,6 +118,11 @@ class WLS:
 
     # MODEL INPUTS
     # These should be immutable
+    @property
+    def df(self):
+        """pd.DataFrame: source dataset"""
+        return self._df
+
     @property
     def y(self):
         """pd.Series: endogenous / dependent variable"""
@@ -140,6 +156,16 @@ class WLS:
             < 250.
         """
         return self._cov_type
+
+    @property
+    def cov_options(self):
+        """dict: wrapper for Statsmodels cov_kwds parameter.
+
+        The main different though is that the dictionary values should not be
+        Pandas objects, e.g. df['state'].  They should be column lists
+        instead.
+        """
+        return self._cov_options
 
     @property
     def alpha(self):
@@ -265,7 +291,12 @@ class WLS:
 
         if printing:
             print("Model fitting in progress...")
-        self._results = model.fit(cov_type=self._cov_type)
+        if self._cov_options:
+            self._results = model.fit(cov_type=self._cov_type,
+                                      cov_kwds=self._get_cov_kwds())
+        else:
+            self._results = model.fit(cov_type=self._cov_type)
+
         self._results_output = self._results.summary(alpha=self._alpha)
         self._resid = self._results.resid
 
@@ -540,6 +571,13 @@ class OLS(WLS):
             - 'HC3': robust standard errors obtained via HCCM estimates.
                 Recommended by by Long & Ervin (1999) where number of
                 observations < 250.
+        cov_options (dict, optional): Specify keyword arguments for cov_type.
+            This is a wrapper around the cov_kwds parameter in Statsmodels,
+            although column lists are used for dict values instead of Pandas
+            objects.
+            e.g. when specifying a group 'state' for clustered standard errors,
+            the form is cov_options={'groups': 'state'},
+            instead of cov_kwds={'groups': df['state']}.
         alpha (float, optional): Defaults to 0.05.  The significance level
             used for reporting confidence intervals in the model summary.
 
@@ -577,15 +615,18 @@ class OLS(WLS):
             standardized estimates.
         is_fitted (Boolean): indicator for whether the model has been fitted.
     Attributes (auxiliary - used to store arguments):
+        df
         cov_type
+        cov_options
         alpha
         w
     """
 
     def __init__(self, df, y_list, regressors_list, *,
-                 cov_type='nonrobust', alpha=0.05):
+                 cov_type='nonrobust', cov_options=None, alpha=0.05):
         """Initializes the OLS model object."""
         # Model inputs (attributes from arguments):
+        self._df = df
         [y_name] = y_list  # sequence unpacking in order to make Series
         self._y = df[y_name]  # Pandas Series
         if len(regressors_list) == 1:
@@ -595,6 +636,7 @@ class OLS(WLS):
             self._X = df[regressors_list]  # Pandas dataframe
         self._w = pd.Series(np.ones(len(self._X)))
         self._cov_type = cov_type
+        self._cov_options = cov_options if cov_options else {}
         self._alpha = alpha
         self._is_fitted = False
 
@@ -625,7 +667,12 @@ class OLS(WLS):
 
         if printing:
             print("Model fitting in progress...")
-        self._results = model.fit(cov_type=self._cov_type)
+        if self._cov_options:
+            self._results = model.fit(cov_type=self._cov_type,
+                                      cov_kwds=self._get_cov_kwds())
+        else:
+            self._results = model.fit(cov_type=self._cov_type)
+
         self._results_output = self._results.summary(alpha=self._alpha)
         self._resid = self._results.resid
 
@@ -663,7 +710,12 @@ class OLS(WLS):
         # Model fitting
         model_standardized = sm.OLS(self._y_standardized,
                                     sm.add_constant(self._X_standardized))
-        results_obj = model_standardized.fit(cov_type=self._cov_type)
+        if self._cov_options:
+            results_obj = model_standardized.fit(cov_type=self._cov_type,
+                                                 cov_kwds=self._get_cov_kwds())
+        else:
+            results_obj = model_standardized.fit(cov_type=self._cov_type)
+
         self._resid_standardized = pd.Series((self._results.get_influence()
                                               .resid_studentized_internal),
                                              index=self._resid.index,
@@ -704,3 +756,19 @@ class OLS(WLS):
             "Unstandardized and Standardized Estimates")
         self._results_output_standardized = std_results_output
         pass
+
+    def _get_cov_kwds(self):
+        # Appelpy cov_options -> Statsmodels cov_kwds
+        cov_kwds = self._cov_options.copy()
+
+        # 'groups' list -> Pandas dataframe/series
+        if 'groups' in self._cov_options:
+            cov_kwds['groups'] = (self._df.loc[:, self._cov_options['groups']]
+                                  .copy())
+
+        # 'time' list -> Numpy array
+        if 'time' in self._cov_options:
+            cov_kwds['time'] = (self._df.loc[:, self._cov_options['time']]
+                                .to_numpy().squeeze())
+
+        return cov_kwds
