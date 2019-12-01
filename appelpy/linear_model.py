@@ -86,7 +86,7 @@ class WLS:
         alpha
     """
 
-    def __init__(self, df, y_list, regressors_list, w=None,
+    def __init__(self, df, y_list, regressors_list, *, w=None,
                  cov_type='nonrobust', alpha=0.05):
         """Initializes the WLS model object."""
         # Model inputs (attributes from arguments):
@@ -237,7 +237,7 @@ class WLS:
         "Boolean: indicator for whether the model has been fitted."
         return self._is_fitted
 
-    def fit(self, printing=False):
+    def fit(self, *, printing=False):
         """Fit the model and save the results in the model object.
 
         Ensure the model dataset does not contain NaN values, inf
@@ -360,7 +360,7 @@ class WLS:
 
         return mean_Xw, mean_yw, std_Xw, std_yw
 
-    def predict(self, X_predict, within_sample=True):
+    def predict(self, X_predict, *, within_sample=True):
         """Predict the value(s) of given example(s) based on the fitted model.
 
         The prediction for an example will return as NaN if:
@@ -462,7 +462,7 @@ class WLS:
         else:
             return regressor_pvalues.iloc[indices_significant].index.to_list()
 
-    def diagnostic_plot(self, plot_name, ax=None):
+    def diagnostic_plot(self, plot_name, *, ax=None):
         """Return a regression diagnostic plot.
 
         Recommended code block for plotting:
@@ -496,15 +496,15 @@ class WLS:
             ax = plt.gca()
 
         if plot_name == 'pp_plot':
-            fig = pp_plot(self.results.resid, ax)
+            fig = pp_plot(self.results.resid, ax=ax)
         if plot_name == 'qq_plot':
-            fig = qq_plot(self.results.resid, ax)
+            fig = qq_plot(self.results.resid, ax=ax)
         if plot_name == 'rvf_plot':
             fig = plot_residuals_vs_fitted_values(
-                self._y, self.results.resid, ax)
+                self._y, self.results.resid, ax=ax)
         if plot_name == 'rvp_plot':
             fig = plot_residuals_vs_predicted_values(
-                self.predict(self._X.to_numpy()), self.results.resid, ax)
+                self.predict(self._X.to_numpy()), self.results.resid, ax=ax)
         return fig
 
 
@@ -582,7 +582,7 @@ class OLS(WLS):
         w
     """
 
-    def __init__(self, df, y_list, regressors_list,
+    def __init__(self, df, y_list, regressors_list, *,
                  cov_type='nonrobust', alpha=0.05):
         """Initializes the OLS model object."""
         # Model inputs (attributes from arguments):
@@ -598,7 +598,7 @@ class OLS(WLS):
         self._alpha = alpha
         self._is_fitted = False
 
-    def fit(self, printing=False):
+    def fit(self, *, printing=False):
         """Fit the model and save the results in the model object.
 
         Ensure the model dataset does not contain NaN values, inf

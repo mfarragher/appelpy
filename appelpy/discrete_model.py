@@ -64,7 +64,8 @@ class Logit:
         alpha
     """
 
-    def __init__(self, df, y_list, regressors_list, alpha=0.05, printing=True):
+    def __init__(self, df, y_list, regressors_list, *,
+                 alpha=0.05, printing=True):
         """Initializes the Logit model object."""
         # Model inputs (attributes from arguments):
         [y_name] = y_list  # sequence unpacking in order to make Series
@@ -185,7 +186,7 @@ class Logit:
         "Boolean: indicator for whether the model has been fitted."
         return self._is_fitted
 
-    def fit(self, printing=False):
+    def fit(self, *, printing=False):
         """Fit the model and save the results in the model object.
 
         Ensure the model dataset does not contain NaN values, inf
@@ -295,7 +296,7 @@ class Logit:
         self._results_output_standardized = std_results_output
         pass
 
-    def predict(self, X_predict, within_sample=True):
+    def predict(self, X_predict, *, within_sample=True):
         """Predict the value(s) of given example(s) based on the fitted model.
 
         The prediction for an example will return as NaN if:

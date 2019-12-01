@@ -15,7 +15,7 @@ __all__ = ['BadApples',
            'partial_regression_plot']
 
 
-def plot_residuals_vs_fitted_values(residual_values, fitted_values,
+def plot_residuals_vs_fitted_values(residual_values, fitted_values, *,
                                     ax=None):
     """Plot a model's residual values (y-axis) on the fitted values
     (x-axis).
@@ -44,7 +44,7 @@ def plot_residuals_vs_fitted_values(residual_values, fitted_values,
     return fig
 
 
-def plot_residuals_vs_predicted_values(residual_values, predicted_values,
+def plot_residuals_vs_predicted_values(residual_values, predicted_values, *,
                                        ax=None):
     """Plot a model's residual values (y-axis) on the predicted values
     (x-axis).
@@ -72,7 +72,7 @@ def plot_residuals_vs_predicted_values(residual_values, predicted_values,
     return fig
 
 
-def pp_plot(residual_values, ax=None):
+def pp_plot(residual_values, *, ax=None):
     """P-P plot compares the empirical cumulative distribution function
     against the theoretical cumulative distribution function given a
     specified model.
@@ -99,7 +99,7 @@ def pp_plot(residual_values, ax=None):
     return fig
 
 
-def qq_plot(residual_values, ax=None):
+def qq_plot(residual_values, *, ax=None):
     """Q-Q plot compares the quantiles of a distribution against the
     quantiles of the theoretical distribution given a specified model.
 
@@ -124,7 +124,7 @@ def qq_plot(residual_values, ax=None):
     return fig
 
 
-def variance_inflation_factors(X, vif_threshold=10):
+def variance_inflation_factors(X, *, vif_threshold=10):
     """Returns a DataFrame with variance inflation factor (VIF) values
     calculated given a matrix of regressor values (X).
 
@@ -159,7 +159,7 @@ def variance_inflation_factors(X, vif_threshold=10):
     return pd.concat([vif, tol, vif_thres], axis='columns')
 
 
-def partial_regression_plot(appelpy_model_object, df, regressor,
+def partial_regression_plot(appelpy_model_object, df, regressor, *,
                             annotate_results=False, ax=None):
     """Also known as the added variable plot, the partial regression plot
     shows the effect of adding another regressor (independent variable)
@@ -432,7 +432,7 @@ class BadApples:
 
         pass
 
-    def fit(self, printing=False):
+    def fit(self, *, printing=False):
         """Calculate the influence, outlier and leverage measures for the
         given model.  The method call also calculates the heuristics for
         determining which observations have 'extreme' values for the measures.
@@ -468,7 +468,7 @@ class BadApples:
         df = pd.concat([self._y, self._X], axis='columns')
         return df[df.index.isin(extreme_indices_list)].copy()
 
-    def _calculate_leverage_vs_residuals_squared(self, rescale=False):
+    def _calculate_leverage_vs_residuals_squared(self, *, rescale=False):
         df = pd.DataFrame(index=self._measures_leverage.index,
                           columns=['leverage', 'resid_score'])
         df['leverage'] = self._measures_leverage
@@ -483,7 +483,7 @@ class BadApples:
 
         return df
 
-    def plot_leverage_vs_residuals_squared(self, annotate=False,
+    def plot_leverage_vs_residuals_squared(self, *, annotate=False,
                                            rescale=False, ax=None):
         """Produce a scatterplot of observations' leverage values
         (y-axis) on their normalized residuals squared (x-axis).  In
@@ -553,7 +553,7 @@ class BadApples:
         return fig
 
 
-def heteroskedasticity_test(test_name, appelpy_model_object,
+def heteroskedasticity_test(test_name, appelpy_model_object, *,
                             regressors_subset=None):
     """Return the results of a heteroskedasticity test given a model.
 

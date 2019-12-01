@@ -111,7 +111,7 @@ class DummyEncoder:
             value in all encoded columns.
     """
 
-    def __init__(self, df, categorical_col_base_levels,
+    def __init__(self, df, categorical_col_base_levels, *,
                  nan_policy='row_of_zero', separator='_'):
         "Initializes the DummyEncoder object."
         if separator == '#':
@@ -254,7 +254,7 @@ class InteractionEncoder:
             value in all encoded columns, where DummyEncoder is used.
     """
 
-    def __init__(self, df, interactions, separator='_'):
+    def __init__(self, df, interactions, *, separator='_'):
         "Initializes the InteractionEncoder object."
         # Inputs for encoding:
         self._df = df
