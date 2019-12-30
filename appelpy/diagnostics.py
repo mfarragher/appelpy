@@ -6,6 +6,7 @@ import statsmodels.stats.api as sms
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+
 __all__ = ['BadApples',
            'plot_residuals_vs_fitted_values',
            'plot_residuals_vs_predicted_values',

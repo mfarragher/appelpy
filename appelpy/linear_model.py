@@ -28,7 +28,7 @@ class WLS:
             variable) or a dependent variable (endogenous variable).
         y_list (list): list containing the dependent variable,
             e.g. ['points']
-        regressors_list (list): list containing one or more regressors,
+        X_list (list): list containing one or more regressors,
             e.g. ['exper', 'age', 'coll', 'expersq']
         w (array-like object): Weights for each observation
         cov_type (str, optional): Defaults to 'nonrobust'.  Standard errors
@@ -89,24 +89,27 @@ class WLS:
 
     Attributes (auxiliary - used to store arguments):
         df
+        y_list
+        X_list
         cov_type
         cov_options
         w
         alpha
     """
 
-    def __init__(self, df, y_list, regressors_list, *, w=None,
+    def __init__(self, df, y_list, X_list, *, w=None,
                  cov_type='nonrobust', cov_options=None, alpha=0.05):
         """Initializes the WLS model object."""
         # Model inputs (attributes from arguments):
         self._df = df
         [y_name] = y_list  # sequence unpacking in order to make Series
         self._y = df[y_name]  # Pandas Series
-        if len(regressors_list) == 1:
-            [x_name] = regressors_list
+        if len(X_list) == 1:
+            [x_name] = X_list
             self._X = df[x_name].to_frame()  # Pandas dataframe
         else:
-            self._X = df[regressors_list]  # Pandas dataframe
+            self._X = df[X_list]  # Pandas dataframe
+        self._y_list, self._X_list = y_list, X_list
         self._cov_type = cov_type
         self._cov_options = cov_options if cov_options else {}
         if w is None:
@@ -137,6 +140,16 @@ class WLS:
     def w(self):
         """pd.Series: weight for each observation"""
         return self._w
+
+    @property
+    def y_list(self):
+        """list: argument for the endogenous / dependent variable"""
+        return self._y_list
+
+    @property
+    def X_list(self):
+        """list: argument for the exogenous / independent variable(s)"""
+        return self._X_list
 
     @property
     def cov_type(self):
@@ -557,7 +570,7 @@ class OLS(WLS):
             variable) or a dependent variable (endogenous variable).
         y_list (list): list containing the dependent variable,
             e.g. ['points']
-        regressors_list (list): list containing one or more regressors,
+        X_list (list): list containing one or more regressors,
             e.g. ['exper', 'age', 'coll', 'expersq']
         cov_type (str, optional): Defaults to 'nonrobust'.  Standard errors
             type.
@@ -622,18 +635,19 @@ class OLS(WLS):
         w
     """
 
-    def __init__(self, df, y_list, regressors_list, *,
+    def __init__(self, df, y_list, X_list, *,
                  cov_type='nonrobust', cov_options=None, alpha=0.05):
         """Initializes the OLS model object."""
         # Model inputs (attributes from arguments):
         self._df = df
         [y_name] = y_list  # sequence unpacking in order to make Series
         self._y = df[y_name]  # Pandas Series
-        if len(regressors_list) == 1:
-            [x_name] = regressors_list
+        if len(X_list) == 1:
+            [x_name] = X_list
             self._X = df[x_name].to_frame()  # Pandas dataframe
         else:
-            self._X = df[regressors_list]  # Pandas dataframe
+            self._X = df[X_list]  # Pandas dataframe
+        self._y_list, self._X_list = y_list, X_list
         self._w = pd.Series(np.ones(len(self._X)))
         self._cov_type = cov_type
         self._cov_options = cov_options if cov_options else {}

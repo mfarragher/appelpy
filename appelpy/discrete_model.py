@@ -24,7 +24,7 @@ class Logit:
             variable) or a dependent variable (endogenous variable).
         y_list (list): list containing the dependent variable,
             e.g. ['points']
-        regressors_list (list): list containing one or more regressors,
+        X_list (list): list containing one or more regressors,
             e.g. ['exper', 'age', 'coll', 'expersq']
         alpha (float, optional): Defaults to 0.05.  The significance level
             used for reporting confidence intervals in the model summary.
@@ -62,21 +62,24 @@ class Logit:
 
     Attributes (auxiliary - used to store arguments):
         df
+        y_list
+        X_list
         alpha
     """
 
-    def __init__(self, df, y_list, regressors_list, *,
+    def __init__(self, df, y_list, X_list, *,
                  alpha=0.05, printing=True):
         """Initializes the Logit model object."""
         # Model inputs (attributes from arguments):
         self._df = df
         [y_name] = y_list  # sequence unpacking in order to make Series
         self._y = df[y_name]  # Pandas Series
-        if len(regressors_list) == 1:
-            [x_name] = regressors_list
+        if len(X_list) == 1:
+            [x_name] = X_list
             self._X = df[x_name].to_frame()  # Pandas dataframe
         else:
-            self._X = df[regressors_list]  # Pandas dataframe
+            self._X = df[X_list]  # Pandas dataframe
+        self._y_list, self._X_list = y_list, X_list
         self._alpha = alpha
         self._is_fitted = False
 
@@ -96,6 +99,16 @@ class Logit:
     def X(self):
         """pd.DataFrame: exogenous / independent variables"""
         return self._X
+
+    @property
+    def y_list(self):
+        """list: argument for the endogenous / dependent variable"""
+        return self._y_list
+
+    @property
+    def X_list(self):
+        """list: argument for the exogenous / independent variable(s)"""
+        return self._X_list
 
     @property
     def X_standardized(self):
