@@ -108,6 +108,10 @@ def test_coefficients(model_mtcars_final):
     assert isinstance(model_mtcars_final.results_output_standardized,
                       pd.io.formats.style.Styler)
 
+    # y_list & X_list
+    assert model_mtcars_final.y_list == ['mpg']
+    assert model_mtcars_final.X_list == ['wt', 'qsec', 'am']
+
 
 @pytest.mark.remote_data
 def test_coefficients_beta(model_cars93):

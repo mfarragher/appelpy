@@ -83,6 +83,13 @@ def test_coefficients(model_salaries):
     assert isinstance(model_salaries.results_output_standardized,
                       pd.io.formats.style.Styler)
 
+    # y_list & X_list
+    assert model_salaries.y_list == ['salary']
+    assert model_salaries.X_list == ['rank_AssocProf', 'rank_Prof',
+                                     'discipline_B',
+                                     'yrs_since_phd', 'yrs_service',
+                                     'sex_Male']
+
 
 @pytest.mark.remote_data
 def test_standard_errors(model_salaries):

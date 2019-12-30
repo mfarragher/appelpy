@@ -101,6 +101,11 @@ def test_coefficients(model_wells):
     assert isinstance(model_wells.results_output_standardized,
                       pd.io.formats.style.Styler)
 
+    # y_list & X_list
+    assert model_wells.y_list == ['switch']
+    assert model_wells.X_list == ['arsenic', 'distance', 'education',
+                                  'association']
+
 
 @pytest.mark.remote_data
 def test_coefficients_beta(model_mtcars_vs):
