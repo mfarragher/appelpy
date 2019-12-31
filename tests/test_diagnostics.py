@@ -7,11 +7,12 @@ import statsmodels.api as sm
 from pandas.util.testing import (assert_series_equal, assert_frame_equal,
                                  assert_numpy_array_equal)
 from appelpy.diagnostics import (variance_inflation_factors, BadApples,
-                                 heteroskedasticity_test,
+                                 heteroskedasticity_test, wald_test,
                                  partial_regression_plot, pp_plot, qq_plot,
                                  plot_residuals_vs_predicted_values,
                                  plot_residuals_vs_fitted_values)
 from appelpy.linear_model import OLS
+from appelpy.discrete_model import Logit
 import matplotlib
 
 
@@ -19,6 +20,12 @@ def _reset_matplotlib():
     # Close open figures at start of new test
     plt.cla()
     plt.close('all')
+
+
+def _round_significant_figures(scalar, n_figures):
+    return (round(scalar,
+                  (-int(np.floor(np.sign(scalar) * np.log10(abs(scalar))))
+                   + n_figures - 1)))
 
 
 @pytest.fixture(scope='module')
@@ -63,6 +70,51 @@ def model_cars():
     df = sm.datasets.get_rdataset('cars').data
     X_list = ['speed']
     model = OLS(df, ['dist'], X_list).fit()
+    return model
+
+
+@pytest.fixture(scope='module')
+def model_wells():
+    df = sm.datasets.get_rdataset('Wells', 'carData').data
+    # Pre-processing
+    for col in ['switch', 'association']:
+        df[col] = np.where(df[col] == 'yes', 1, 0)
+    # Model test case
+    X_list = ['arsenic', 'distance', 'education', 'association']
+    model = Logit(df, ['switch'], X_list).fit()
+    return model
+
+
+@pytest.fixture(scope='module')
+def model_caschools():
+    df = sm.datasets.get_rdataset('Caschool', 'Ecdat').data
+
+    # Feature
+    df['expnstu_1000'] = df['expnstu'] / 1000
+    # Model
+    X_list = ['str', 'elpct', 'expnstu_1000']
+    model_hc1 = OLS(df, ['testscr'], X_list).fit()
+    return model_hc1
+
+
+@pytest.fixture(scope='module')
+def model_longley():
+    df = sm.datasets.get_rdataset('longley').data
+
+    # Pre-processing - column names:
+    df.columns = (df.columns
+                  .str.replace(r"[ ,.,-]", '_')
+                  .str.lower())
+    # Pre-processing - match the longley from statsmodels.datasets:
+    for col in ['gnp', 'population', 'employed']:
+        df[col] = df[col] * 1000
+    for col in ['armed_forces', 'unemployed']:
+        df[col] = df[col] * 10
+
+    # Model
+    X_list = ['gnp_deflator', 'gnp', 'unemployed', 'armed_forces',
+              'population', 'year']
+    model = OLS(df, ['employed'], X_list).fit()
     return model
 
 
@@ -317,6 +369,78 @@ def test_heteroskedasticity_diagnostics(model_cars, model_journals):
                                        regressors_subset=['ln_ppc'])
     assert (np.round(lm, 0) == expected_lm)
     assert (np.round(pval, 3) == expected_pval)
+
+
+@pytest.mark.remote_data
+def test_wald_test_output(model_wells, model_caschools, model_longley):
+    # 1) Logit
+    # model_wells Wald test in R:
+    #
+    # library(carData)
+    # library(survey)
+    #
+    # data(Wells)
+    #
+    # model <- glm(formula = switch ~ arsenic + distance + education + association,
+    # data=Wells, family=binomial())
+    #
+    # regTermTest(model, ~association+education, df=Inf)
+
+    actual_wells_output = wald_test(model_wells,
+                                    ['association', 'education'])
+    expected_wells_output_rounded = {'distribution': 'chi2',
+                                     'test_stat': 22.53277,
+                                     'p_value': 1.2796e-05}
+    assert (actual_wells_output['distribution']
+            == expected_wells_output_rounded['distribution'])
+    assert (np.round(actual_wells_output['test_stat'], 5)
+            == expected_wells_output_rounded['test_stat'])
+    assert (_round_significant_figures(actual_wells_output['p_value'], 5)
+            == expected_wells_output_rounded['p_value'])
+
+    # 2) OLS - caschools
+    actual_caschools_output = wald_test(model_caschools,
+                                        {'str': 0, 'expnstu_1000': 0})
+    expected_caschools_output_rounded = {'distribution': 'F',
+                                         'test_stat': 8.0101,
+                                         'p_value': 0.000386}
+    assert (actual_caschools_output['distribution']
+            == expected_caschools_output_rounded['distribution'])
+    assert (np.round(actual_caschools_output['test_stat'], 4)
+            == expected_caschools_output_rounded['test_stat'])
+    assert (_round_significant_figures(actual_caschools_output['p_value'], 3)
+            == expected_caschools_output_rounded['p_value'])
+
+    # 3) OLS - Longley
+    actual_longley_output = wald_test(model_longley,
+                                      {('gnp_deflator', 'gnp'): 0,
+                                       'unemployed': 2,
+                                       'year': 1829})
+    expected_longley_output_rounded = {'distribution': 'F',
+                                       'test_stat': 144.1798,
+                                       'p_value': 6.322e-08}
+    assert (actual_longley_output['distribution']
+            == expected_longley_output_rounded['distribution'])
+    assert (np.round(actual_longley_output['test_stat'], 4)
+            == expected_longley_output_rounded['test_stat'])
+    assert (_round_significant_figures(actual_longley_output['p_value'], 4)
+            == expected_longley_output_rounded['p_value'])
+
+    # Invalid arguments:
+    with pytest.raises(ValueError):
+        wald_test(model_caschools, ['INVALID', 'str'])
+    with pytest.raises(TypeError):
+        wald_test(model_caschools, {'str': 'non-scalar', 'expnstu_1000': 0})
+    with pytest.raises(ValueError):
+        wald_test(model_caschools, {'INVALID': 0, 'str': 0})
+    with pytest.raises(ValueError):
+        wald_test(model_caschools, {('str', 'expnstu_1000', 'elpct'): 0})
+    with pytest.raises(ValueError):
+        wald_test(model_caschools, {('str', 'INVALID'): 0})
+    with pytest.raises(TypeError):
+        wald_test(model_caschools, {0: 0})
+    with pytest.raises(TypeError):
+        wald_test(model_caschools, 'bad_argument')
 
 
 @pytest.mark.remote_data
