@@ -633,3 +633,110 @@ def heteroskedasticity_test(test_name, appelpy_model_object, *,
         raise ValueError(
             """Choose one of 'breusch_pagan', 'breusch_pagan_studentized' or
             'white' as a test name.""")
+
+
+def wald_test(appelpy_model_object, hypotheses_object):
+    """Undertake a Wald test for joint testing of multiple hypotheses, given
+    a model.
+
+    These are examples of hypotheses setups that can be tested:
+    - Joint test on whether the coefficients of col_a and col_b are
+    significantly different from 0.
+        hypotheses_object -> ['col_a', 'col_b']
+        Object can take a LIST for testing of coefficients against 0.
+    - Test of whether the coefficients of columns are significantly different
+    from a scalar, e.g. 20.
+        hypotheses_object -> {'col_a': 20}
+        Object can take a DICT when non-zero values for coefficients are
+        tested.
+    - Test of whether the difference between col_a and col_b is significantly
+    different from a scalar, e.g. 10
+        hypotheses_object -> {('col_a', 'col_b): 10}
+        OBJECT can take a DICT, where the key is a tuple of two column strings,
+        when a difference between two coefficients is tested.
+
+    The function returns a dictionary with the key information about the
+    test results: the test statistic, the p-value and the distribution of
+    the statistic (i.e. 'chi2' or 'F').
+
+    Args:
+        appelpy_model_object: the object that contains the info about a
+            model fitted with Appelpy.  e.g. for OLS regression the object
+            would be of the type appelpy.linear_model.OLS.
+        hypotheses_object (list or dict): for tests on whether all the passed
+            regressors have a coefficient of 0, pass a LIST,
+            e.g. ['str', 'elpct']
+            In this case the initial hypotheses being jointly tested are:
+                - `elpct` = 0
+                - `str` = 0
+
+            For more complex cases (e.g. test whether two regressors have same
+            coefficient; test coefficient against a non-zero scalar), pass a
+            DICT, where the key is a regressor or a tuple of regressors and
+            the value is a scalar,
+            e.g. {('GNPDEFL', 'GNP'): 0, 'UNEMP': 2, 'YEAR': 1829}
+            for the Longley dataset.
+            In this case, the initial hypotheses being jointly tested are:
+                - `GNPDEFL` - `GNP` = 0 (first item of tuple minus second item)
+                - `YEAR` = 1829
+                - `UNEMP` = 2
+
+    Raises:
+        ValueError or TypeError where the hypotheses_object is a bad argument.
+            e.g. column not found in model object; not a dict or list; dict
+            has invalid keys or values.
+
+    Returns:
+        dict containing the following info:
+            - distribution (str): either 'F' or 'chi2'
+            - test_stat (float): the test statistic from the distribution used
+            - p_value (float): the p-value calculated for the test
+    """
+
+    hypotheses = []  # list for collecting hypotheses
+    if isinstance(hypotheses_object, list):
+        for x in hypotheses_object:
+            if x not in appelpy_model_object.X_list:
+                raise ValueError("Column '{}' not found in the fitted model.".format(x))
+            hypotheses.append('({} = 0)'.format(x))
+    elif isinstance(hypotheses_object, dict):
+        for k, v in hypotheses_object.items():
+            # Check value:
+            if not isinstance(v, (float, int)):
+                raise TypeError("Check that the input dictionary's values are numeric.")
+
+            # Check key:
+            if isinstance(k, tuple):
+                if not set(k).issubset(set(appelpy_model_object.X_list)):
+                    raise ValueError("Check that the column names given are in the fitted model.")
+                elif len(k) > 2:
+                    raise ValueError("Ensure that only two column names are given in an input tuple.")
+                else:
+                    hypotheses.append('({} - {} = {})'.format(k[0], k[1], v))
+            elif isinstance(k, str):
+                if k not in appelpy_model_object.X_list:
+                    raise ValueError("Check that the column names given are in the fitted model.")
+                else:
+                    hypotheses.append('({} = {})'.format(k, v))
+            else:
+                raise TypeError("Ensure input dictionary's keys are either strings or 2-item tuples of strings.")
+    else:
+        raise TypeError("Specify either a dict or a list for the hypotheses_object.")
+
+    hypotheses_str = ', '.join(hypotheses)  # '(hyp1), ..., (hypN)' form
+
+    # Get the Statsmodels Wald test object for the specified hypotheses:
+    # calculate F statistic (e.g. for OLS)
+    if appelpy_model_object.results.use_t:
+        test_results = appelpy_model_object.results.wald_test(hypotheses_str,
+                                                              use_f=True)
+    else:  # calculate chi2 statistic (e.g. for Logit as dispersion param = 1)
+        test_results = appelpy_model_object.results.wald_test(hypotheses_str,
+                                                              use_f=False)
+
+    # Gather test info in a dict:
+    test_results_output = {}
+    test_results_output['distribution'] = test_results.distribution
+    test_results_output['test_stat'] = test_results.statistic.flatten()[0]
+    test_results_output['p_value'] = test_results.pvalue.flatten()[0]
+    return test_results_output
