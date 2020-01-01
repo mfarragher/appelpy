@@ -184,8 +184,7 @@ class Logit:
     def model_selection_stats(self):
         """dict: model selection stats (keys) and their values from the model.
 
-        Examples of stats include Root MSE, AIC, BIC, R-squared,
-        R-squared (adjusted).
+        Examples of stats include log likelihood, pseudo R-squared, etc.
         """
         return self._model_selection_stats
 
@@ -237,10 +236,10 @@ class Logit:
             self._results = model.fit()
         self._results_output = self._results.summary(alpha=self._alpha)
 
-        model_selection_dict = {"Log-likelihood": self._results.llf,
-                                "Pseudo R-squared": self._results.prsquared,
-                                "AIC": self._results.aic,
-                                "BIC": self._results.bic}
+        model_selection_dict = {"log_likelihood": self._results.llf,
+                                "r_squared_pseudo": self._results.prsquared,
+                                "aic": self._results.aic,
+                                "bic": self._results.bic}
         self._model_selection_stats = model_selection_dict
         self._log_likelihood = self._results.llf
         self._odds_ratios = pd.Series(np.exp(self._results.params

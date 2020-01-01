@@ -313,11 +313,11 @@ class WLS:
         self._results_output = self._results.summary(alpha=self._alpha)
         self._resid = self._results.resid
 
-        model_selection_dict = {"Root MSE": np.sqrt(self._results.mse_resid),
-                                "R-squared": self._results.rsquared,
-                                "R-squared (adj)": self._results.rsquared_adj,
-                                "AIC": self._results.aic,
-                                "BIC": self._results.bic}
+        model_selection_dict = {"root_mse": np.sqrt(self._results.mse_resid),
+                                "r_squared": self._results.rsquared,
+                                "r_squared_adj": self._results.rsquared_adj,
+                                "aic": self._results.aic,
+                                "bic": self._results.bic}
         self._model_selection_stats = model_selection_dict
 
         self._standardize_results()
@@ -690,11 +690,11 @@ class OLS(WLS):
         self._results_output = self._results.summary(alpha=self._alpha)
         self._resid = self._results.resid
 
-        model_selection_dict = {"Root MSE": np.sqrt(self._results.mse_resid),
-                                "R-squared": self._results.rsquared,
-                                "R-squared (adj)": self._results.rsquared_adj,
-                                "AIC": self._results.aic,
-                                "BIC": self._results.bic}
+        model_selection_dict = {"root_mse": np.sqrt(self._results.mse_resid),
+                                "r_squared": self._results.rsquared,
+                                "r_squared_adj": self._results.rsquared_adj,
+                                "aic": self._results.aic,
+                                "bic": self._results.bic}
         self._model_selection_stats = model_selection_dict
 
         self._standardize_results()

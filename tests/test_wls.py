@@ -128,13 +128,13 @@ def test_model_selection_stats(model_salaries):
     expected_r_squared_adj = 0.9977
 
     assert(np.round((model_salaries
-                     .model_selection_stats['Root MSE']), 3)
+                     .model_selection_stats['root_mse']), 3)
            == expected_root_mse)
     assert(np.round((model_salaries
-                     .model_selection_stats['R-squared']), 4)
+                     .model_selection_stats['r_squared']), 4)
            == expected_r_squared)
     assert(np.round((model_salaries
-                     .model_selection_stats['R-squared (adj)']), 4)
+                     .model_selection_stats['r_squared_adj']), 4)
            == expected_r_squared_adj)
 
 

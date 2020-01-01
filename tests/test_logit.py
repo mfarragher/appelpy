@@ -145,7 +145,7 @@ def test_z_scores(model_wells):
 def test_aic(model_wells):
     expected_aic = 3917.8
     assert np.round(
-        model_wells.model_selection_stats['AIC'], 1) == expected_aic
+        model_wells.model_selection_stats['aic'], 1) == expected_aic
 
 
 @pytest.mark.remote_data
