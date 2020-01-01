@@ -316,29 +316,55 @@ def test_heteroskedasticity_diagnostics(model_cars, model_journals):
         heteroskedasticity_test(model_cars, 'bp')
         heteroskedasticity_test(model_cars, 100)
 
+    expected_keys = set(['distribution', 'nu', 'test_stat', 'p_value'])
+
     # Test on actual data
-    expected_lm, expected_pval = (4.650233, 0.03104933)
-    lm, pval = heteroskedasticity_test('breusch_pagan',
-                                       model_cars)
-    assert (np.round(lm, 6) == expected_lm)
-    assert (np.round(pval, 8) == expected_pval)
+    actual_bp_results = heteroskedasticity_test('breusch_pagan',
+                                                model_cars)
+    expected_bp_results = {'distribution': 'chi2', 'nu': 1,
+                           'test_stat': 4.650233, 'p_value': 0.03104933}
+    assert (np.round(actual_bp_results['test_stat'], 6)
+            == expected_bp_results['test_stat'])
+    assert (np.round(actual_bp_results['p_value'], 8)
+            == expected_bp_results['p_value'])
+    for k in ['distribution', 'nu']:
+        assert actual_bp_results[k] == expected_bp_results[k]
+    assert set(actual_bp_results.keys()) == expected_keys
 
-    expected_lm, expected_pval = (9.8, 0.002)
-    lm, pval = heteroskedasticity_test('breusch_pagan_studentized',
-                                       model_journals)
-    assert (np.round(lm, 1) == expected_lm)
-    assert (np.round(pval, 3) == expected_pval)
+    actual_bp_results = heteroskedasticity_test('breusch_pagan_studentized',
+                                                model_journals)
+    expected_bp_results = {'distribution': 'chi2', 'nu': 1,
+                           'test_stat': 9.8, 'p_value': 0.002}
+    assert (np.round(actual_bp_results['test_stat'], 1)
+            == expected_bp_results['test_stat'])
+    assert (np.round(actual_bp_results['p_value'], 3)
+            == expected_bp_results['p_value'])
+    for k in ['distribution', 'nu']:
+        assert actual_bp_results[k] == expected_bp_results[k]
+    assert set(actual_bp_results.keys()) == expected_keys
 
-    expected_lm, expected_pval = (3.2149, 0.07297)
-    lm, pval = heteroskedasticity_test('breusch_pagan_studentized',
-                                       model_cars)
-    assert (np.round(lm, 4) == expected_lm)
-    assert (np.round(pval, 5) == expected_pval)
+    actual_bp_results = heteroskedasticity_test('breusch_pagan_studentized',
+                                                model_cars)
+    expected_bp_results = {'distribution': 'chi2', 'nu': 1,
+                           'test_stat': 3.2149, 'p_value': 0.07297}
+    assert (np.round(actual_bp_results['test_stat'], 4)
+            == expected_bp_results['test_stat'])
+    assert (np.round(actual_bp_results['p_value'], 5)
+            == expected_bp_results['p_value'])
+    for k in ['distribution', 'nu']:
+        assert actual_bp_results[k] == expected_bp_results[k]
+    assert set(actual_bp_results.keys()) == expected_keys
 
-    expected_lm, expected_pval = (11, 0.004)
-    lm, pval = heteroskedasticity_test('white', model_journals)
-    assert (np.round(lm, 0) == expected_lm)
-    assert (np.round(pval, 3) == expected_pval)
+    expected_w_results = {'distribution': 'chi2', 'nu': 2,
+                          'test_stat': 11, 'p_value': 0.004}
+    actual_w_results = heteroskedasticity_test('white', model_journals)
+    assert (np.round(actual_w_results['test_stat'], 0)
+            == expected_w_results['test_stat'])
+    assert (np.round(actual_w_results['p_value'], 3)
+            == expected_w_results['p_value'])
+    for k in ['distribution', 'nu']:
+        assert actual_w_results[k] == expected_w_results[k]
+    assert set(actual_w_results.keys()) == expected_keys
 
     # Regressors subset (check that passed list works)
     with pytest.raises(ValueError):
@@ -350,29 +376,49 @@ def test_heteroskedasticity_diagnostics(model_cars, model_journals):
                                 model_cars,
                                 regressors_subset=['time'])
 
-    expected_lm, expected_pval = (4.650233, 0.03104933)
-    lm, pval = heteroskedasticity_test('breusch_pagan',
-                                       model_cars,
-                                       regressors_subset=['speed'])
-    assert (np.round(lm, 6) == expected_lm)
-    assert (np.round(pval, 8) == expected_pval)
+    actual_bp_results = heteroskedasticity_test('breusch_pagan',
+                                                model_cars,
+                                                regressors_subset=['speed'])
+    expected_bp_results = {'distribution': 'chi2', 'nu': 1,
+                           'test_stat': 4.650233, 'p_value': 0.03104933}
+    assert (np.round(actual_bp_results['test_stat'], 6)
+            == expected_bp_results['test_stat'])
+    assert (np.round(actual_bp_results['p_value'], 8)
+            == expected_bp_results['p_value'])
+    for k in ['distribution', 'nu']:
+        assert actual_bp_results[k] == expected_bp_results[k]
+    assert set(actual_bp_results.keys()) == expected_keys
 
-    expected_lm, expected_pval = (3.2149, 0.07297)
-    lm, pval = heteroskedasticity_test('breusch_pagan_studentized',
-                                       model_cars,
-                                       regressors_subset=['speed'])
-    assert (np.round(lm, 4) == expected_lm)
-    assert (np.round(pval, 5) == expected_pval)
+    actual_bp_results = heteroskedasticity_test('breusch_pagan_studentized',
+                                                model_cars,
+                                                regressors_subset=['speed'])
+    expected_bp_results = {'distribution': 'chi2', 'nu': 1,
+                           'test_stat': 3.2149, 'p_value': 0.07297}
+    assert (np.round(actual_bp_results['test_stat'], 4)
+            == expected_bp_results['test_stat'])
+    assert (np.round(actual_bp_results['p_value'], 5)
+            == expected_bp_results['p_value'])
+    for k in ['distribution', 'nu']:
+        assert actual_bp_results[k] == expected_bp_results[k]
+    assert set(actual_bp_results.keys()) == expected_keys
 
-    expected_lm, expected_pval = (11, 0.004)
-    lm, pval = heteroskedasticity_test('white', model_journals,
-                                       regressors_subset=['ln_ppc'])
-    assert (np.round(lm, 0) == expected_lm)
-    assert (np.round(pval, 3) == expected_pval)
+    expected_w_results = {'distribution': 'chi2', 'nu': 2,
+                          'test_stat': 11, 'p_value': 0.004}
+    actual_w_results = heteroskedasticity_test('white', model_journals,
+                                               regressors_subset=['ln_ppc'])
+    assert (np.round(actual_w_results['test_stat'], 0)
+            == expected_w_results['test_stat'])
+    assert (np.round(actual_w_results['p_value'], 3)
+            == expected_w_results['p_value'])
+    for k in ['distribution', 'nu']:
+        assert actual_w_results[k] == expected_w_results[k]
+    assert set(actual_w_results.keys()) == expected_keys
 
 
 @pytest.mark.remote_data
 def test_wald_test_output(model_wells, model_caschools, model_longley):
+    expected_dict_keys = set(['distribution', 'nu', 'test_stat', 'p_value'])
+
     # 1) Logit
     # model_wells Wald test in R:
     #
@@ -388,7 +434,7 @@ def test_wald_test_output(model_wells, model_caschools, model_longley):
 
     actual_wells_output = wald_test(model_wells,
                                     ['association', 'education'])
-    expected_wells_output_rounded = {'distribution': 'chi2',
+    expected_wells_output_rounded = {'distribution': 'chi2', 'nu': 2,
                                      'test_stat': 22.53277,
                                      'p_value': 1.2796e-05}
     assert (actual_wells_output['distribution']
@@ -397,11 +443,12 @@ def test_wald_test_output(model_wells, model_caschools, model_longley):
             == expected_wells_output_rounded['test_stat'])
     assert (_round_significant_figures(actual_wells_output['p_value'], 5)
             == expected_wells_output_rounded['p_value'])
+    assert set(actual_wells_output.keys()) == expected_dict_keys
 
     # 2) OLS - caschools
     actual_caschools_output = wald_test(model_caschools,
                                         {'str': 0, 'expnstu_1000': 0})
-    expected_caschools_output_rounded = {'distribution': 'F',
+    expected_caschools_output_rounded = {'distribution': 'F', 'nu': 2,
                                          'test_stat': 8.0101,
                                          'p_value': 0.000386}
     assert (actual_caschools_output['distribution']
@@ -410,13 +457,14 @@ def test_wald_test_output(model_wells, model_caschools, model_longley):
             == expected_caschools_output_rounded['test_stat'])
     assert (_round_significant_figures(actual_caschools_output['p_value'], 3)
             == expected_caschools_output_rounded['p_value'])
+    assert set(actual_caschools_output.keys()) == expected_dict_keys
 
     # 3) OLS - Longley
     actual_longley_output = wald_test(model_longley,
                                       {('gnp_deflator', 'gnp'): 0,
                                        'unemployed': 2,
                                        'year': 1829})
-    expected_longley_output_rounded = {'distribution': 'F',
+    expected_longley_output_rounded = {'distribution': 'F', 'nu': 3,
                                        'test_stat': 144.1798,
                                        'p_value': 6.322e-08}
     assert (actual_longley_output['distribution']
@@ -425,6 +473,7 @@ def test_wald_test_output(model_wells, model_caschools, model_longley):
             == expected_longley_output_rounded['test_stat'])
     assert (_round_significant_figures(actual_longley_output['p_value'], 4)
             == expected_longley_output_rounded['p_value'])
+    assert set(actual_longley_output.keys()) == expected_dict_keys
 
     # Invalid arguments:
     with pytest.raises(ValueError):

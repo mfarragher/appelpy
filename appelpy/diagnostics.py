@@ -558,6 +558,12 @@ def heteroskedasticity_test(test_name, appelpy_model_object, *,
                             regressors_subset=None):
     """Return the results of a heteroskedasticity test given a model.
 
+    Output is a dictionary with with these keys:
+    - 'distribution' (str): the distribution of the test
+    - 'nu' (int): the number of degrees of freedom for the test
+    - 'test_stat' (float): the value of the test statistic
+    - 'p_value' (float): the p-value for the test
+
     Supported tests:
     - 'breusch_pagan': equivalent to Stata's `hettest` command.
     - 'breusch_pagan_studentized': equivalent to default behaviour of the
@@ -580,14 +586,17 @@ def heteroskedasticity_test(test_name, appelpy_model_object, *,
         ValueError: Check the regressors_subset items were used in the model.
 
     Returns:
-        test_statistic, p_value: the test statistic and the corresponding
-            p-value.
+        dict: info for the test, e.g. test distribution, degrees of freedom,
+            test statistic and p-value.
     """
+
+    # Gather test info in a dict:
+    test_summary = {'distribution': 'chi2'}
 
     if test_name == 'breusch_pagan':
         # Get residuals (from model object or run again on a regressors subset)
         if regressors_subset:
-            if not set(regressors_subset).issubset(set(appelpy_model_object.X.columns)):
+            if not set(regressors_subset).issubset(set(appelpy_model_object.X_list)):
                 raise ValueError(
                     'Regressor(s) not recognised in dataset.  Check the list given to the function.')
             reduced_model = sm.OLS(appelpy_model_object.y,
@@ -605,39 +614,55 @@ def heteroskedasticity_test(test_name, appelpy_model_object, *,
         aux_model = sm.OLS(scaled_sq_resid, sm.add_constant(y_hat)).fit()
 
         # Calculate test stat and pval
-        lm = aux_model.ess / 2
-        pval = sp.stats.chi2.sf(lm, 1)  # dof=1
-        return lm, pval
+        test_summary['nu'] = 1
+        test_summary['test_stat'] = aux_model.ess / 2
+        test_summary['p_value'] = sp.stats.chi2.sf(
+            test_summary['test_stat'], test_summary['nu'])
     elif test_name == 'breusch_pagan_studentized':
         if regressors_subset:
-            if not set(regressors_subset).issubset(set(appelpy_model_object.X.columns)):
+            if not set(regressors_subset).issubset(set(appelpy_model_object.X_list)):
                 raise ValueError(
                     'Regressor(s) not recognised in dataset.  Check the list given to the function.')
             reduced_model = sm.OLS(appelpy_model_object.y,
                                    sm.add_constant(appelpy_model_object.X[regressors_subset]))
             reduced_model_results = reduced_model.fit()
-            lm, pval, _, _ = sms.het_breuschpagan(reduced_model_results.resid,
-                                                  reduced_model_results.model.exog)
-            return lm, pval
+            test_summary['nu'] = 1
+            stat, pval, _, _ = sms.het_breuschpagan(reduced_model_results.resid,
+                                                    reduced_model_results.model.exog)
+            test_summary['test_stat'], test_summary['p_value'] = stat, pval
         else:
-            lm, pval, _, _ = sms.het_breuschpagan(appelpy_model_object.results.resid,
-                                                  appelpy_model_object.results.model.exog)
-            return lm, pval
+            test_summary['nu'] = 1
+            stat, pval, _, _ = sms.het_breuschpagan(appelpy_model_object.results.resid,
+                                                    appelpy_model_object.results.model.exog)
+            test_summary['test_stat'], test_summary['p_value'] = stat, pval
     elif test_name == 'white':
         if regressors_subset:
             print("Ignoring regressors_subset.  White test will use original regressors.")
+        test_summary['nu'] = (
+            int((len(appelpy_model_object.X_list) ** 2
+                + 3 * len(appelpy_model_object.X_list))
+                / 2))
         white_test = sms.het_white(appelpy_model_object.resid,
                                    sm.add_constant(appelpy_model_object.X))
-        return white_test[0], white_test[1]  # lm, pval
+        test_summary['test_stat'] = white_test[0]
+        test_summary['p_value'] = white_test[1]
     else:
         raise ValueError(
             """Choose one of 'breusch_pagan', 'breusch_pagan_studentized' or
             'white' as a test name.""")
 
+    return test_summary
+
 
 def wald_test(appelpy_model_object, hypotheses_object):
     """Undertake a Wald test for joint testing of multiple hypotheses, given
     a model.
+
+    Output is a dictionary with with these keys:
+    - 'distribution' (str): the distribution of the test
+    - 'nu' (int): the number of degrees of freedom for the test
+    - 'test_stat' (float): the value of the test statistic
+    - 'p_value' (float): the p-value for the test
 
     These are examples of hypotheses setups that can be tested:
     - Joint test on whether the coefficients of col_a and col_b are
@@ -654,10 +679,6 @@ def wald_test(appelpy_model_object, hypotheses_object):
         hypotheses_object -> {('col_a', 'col_b): 10}
         OBJECT can take a DICT, where the key is a tuple of two column strings,
         when a difference between two coefficients is tested.
-
-    The function returns a dictionary with the key information about the
-    test results: the test statistic, the p-value and the distribution of
-    the statistic (i.e. 'chi2' or 'F').
 
     Args:
         appelpy_model_object: the object that contains the info about a
@@ -687,10 +708,8 @@ def wald_test(appelpy_model_object, hypotheses_object):
             has invalid keys or values.
 
     Returns:
-        dict containing the following info:
-            - distribution (str): either 'F' or 'chi2'
-            - test_stat (float): the test statistic from the distribution used
-            - p_value (float): the p-value calculated for the test
+        dict: info for the test, e.g. test distribution, degrees of freedom,
+            test statistic and p-value.
     """
 
     hypotheses = []  # list for collecting hypotheses
@@ -735,8 +754,9 @@ def wald_test(appelpy_model_object, hypotheses_object):
                                                               use_f=False)
 
     # Gather test info in a dict:
-    test_results_output = {}
-    test_results_output['distribution'] = test_results.distribution
-    test_results_output['test_stat'] = test_results.statistic.flatten()[0]
-    test_results_output['p_value'] = test_results.pvalue.flatten()[0]
-    return test_results_output
+    test_summary = {}
+    test_summary['distribution'] = test_results.distribution
+    test_summary['nu'] = len(hypotheses_object)
+    test_summary['test_stat'] = test_results.statistic.flatten()[0]
+    test_summary['p_value'] = test_results.pvalue.flatten()[0]
+    return test_summary
