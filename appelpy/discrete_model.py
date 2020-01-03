@@ -24,7 +24,7 @@ class Logit:
             variable) or a dependent variable (endogenous variable).
         y_list (list): list containing the dependent variable,
             e.g. ['points']
-        regressors_list (list): list containing one or more regressors,
+        X_list (list): list containing one or more regressors,
             e.g. ['exper', 'age', 'coll', 'expersq']
         alpha (float, optional): Defaults to 0.05.  The significance level
             used for reporting confidence intervals in the model summary.
@@ -61,24 +61,35 @@ class Logit:
         is_fitted (Boolean): indicator for whether the model has been fitted.
 
     Attributes (auxiliary - used to store arguments):
+        df
+        y_list
+        X_list
         alpha
     """
 
-    def __init__(self, df, y_list, regressors_list, alpha=0.05, printing=True):
+    def __init__(self, df, y_list, X_list, *,
+                 alpha=0.05, printing=True):
         """Initializes the Logit model object."""
         # Model inputs (attributes from arguments):
+        self._df = df
         [y_name] = y_list  # sequence unpacking in order to make Series
         self._y = df[y_name]  # Pandas Series
-        if len(regressors_list) == 1:
-            [x_name] = regressors_list
+        if len(X_list) == 1:
+            [x_name] = X_list
             self._X = df[x_name].to_frame()  # Pandas dataframe
         else:
-            self._X = df[regressors_list]  # Pandas dataframe
+            self._X = df[X_list]  # Pandas dataframe
+        self._y_list, self._X_list = y_list, X_list
         self._alpha = alpha
         self._is_fitted = False
 
     # MODEL INPUTS
     # These should be immutable
+    @property
+    def df(self):
+        """pd.DataFrame: source dataset"""
+        return self._df
+
     @property
     def y(self):
         """pd.Series: endogenous / dependent variable"""
@@ -88,6 +99,16 @@ class Logit:
     def X(self):
         """pd.DataFrame: exogenous / independent variables"""
         return self._X
+
+    @property
+    def y_list(self):
+        """list: argument for the endogenous / dependent variable"""
+        return self._y_list
+
+    @property
+    def X_list(self):
+        """list: argument for the exogenous / independent variable(s)"""
+        return self._X_list
 
     @property
     def X_standardized(self):
@@ -163,8 +184,7 @@ class Logit:
     def model_selection_stats(self):
         """dict: model selection stats (keys) and their values from the model.
 
-        Examples of stats include Root MSE, AIC, BIC, R-squared,
-        R-squared (adjusted).
+        Examples of stats include log likelihood, pseudo R-squared, etc.
         """
         return self._model_selection_stats
 
@@ -185,7 +205,7 @@ class Logit:
         "Boolean: indicator for whether the model has been fitted."
         return self._is_fitted
 
-    def fit(self, printing=False):
+    def fit(self, *, printing=False):
         """Fit the model and save the results in the model object.
 
         Ensure the model dataset does not contain NaN values, inf
@@ -216,10 +236,10 @@ class Logit:
             self._results = model.fit()
         self._results_output = self._results.summary(alpha=self._alpha)
 
-        model_selection_dict = {"Log-likelihood": self._results.llf,
-                                "Pseudo R-squared": self._results.prsquared,
-                                "AIC": self._results.aic,
-                                "BIC": self._results.bic}
+        model_selection_dict = {"log_likelihood": self._results.llf,
+                                "r_squared_pseudo": self._results.prsquared,
+                                "aic": self._results.aic,
+                                "bic": self._results.bic}
         self._model_selection_stats = model_selection_dict
         self._log_likelihood = self._results.llf
         self._odds_ratios = pd.Series(np.exp(self._results.params
@@ -295,7 +315,7 @@ class Logit:
         self._results_output_standardized = std_results_output
         pass
 
-    def predict(self, X_predict, within_sample=True):
+    def predict(self, X_predict, *, within_sample=True):
         """Predict the value(s) of given example(s) based on the fitted model.
 
         The prediction for an example will return as NaN if:

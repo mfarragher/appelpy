@@ -4,6 +4,7 @@ import numpy as np
 import statsmodels
 import statsmodels.api as sm
 from pandas.util.testing import (assert_series_equal,
+                                 assert_frame_equal,
                                  assert_numpy_array_equal)
 from appelpy.utils import DummyEncoder
 from appelpy.linear_model import OLS
@@ -107,6 +108,10 @@ def test_coefficients(model_mtcars_final):
     assert isinstance(model_mtcars_final.results_output_standardized,
                       pd.io.formats.style.Styler)
 
+    # y_list & X_list
+    assert model_mtcars_final.y_list == ['mpg']
+    assert model_mtcars_final.X_list == ['wt', 'qsec', 'am']
+
 
 @pytest.mark.remote_data
 def test_coefficients_beta(model_cars93):
@@ -138,6 +143,7 @@ def test_standard_errors(model_mtcars_final):
                         expected_se)
 
     assert(model_mtcars_final.cov_type == 'nonrobust')
+    assert(model_mtcars_final.cov_options == {})
 
 
 @pytest.mark.remote_data
@@ -158,13 +164,13 @@ def test_model_selection_stats(model_mtcars_final):
     expected_r_squared_adj = 0.8336
 
     assert(np.round((model_mtcars_final
-                     .model_selection_stats['Root MSE']), 3)
+                     .model_selection_stats['root_mse']), 3)
            == expected_root_mse)
     assert(np.round((model_mtcars_final
-                     .model_selection_stats['R-squared']), 4)
+                     .model_selection_stats['r_squared']), 4)
            == expected_r_squared)
     assert(np.round((model_mtcars_final
-                     .model_selection_stats['R-squared (adj)']), 4)
+                     .model_selection_stats['r_squared_adj']), 4)
            == expected_r_squared_adj)
 
 
@@ -266,3 +272,63 @@ def test_predictions(model_caschools):
         model_caschools.predict(pd.Series([41]))
     with pytest.raises(ValueError):
         model_caschools.predict(np.array([[41]]))
+
+
+@pytest.mark.remote_data
+def test_clustered_standard_errors():
+    # Pooled OLS - Fatality dataset
+    df = sm.datasets.get_rdataset('Fatality', 'Ecdat').data
+
+    y_list, X_list = ['mrall'], ['beertax']
+    model = OLS(df, y_list, X_list,
+                cov_type='cluster',
+                cov_options={'groups': ['state']}
+                ).fit()
+
+    expected_se = pd.Series({'const': 0.1185192,
+                             'beertax': 0.119686})
+    assert_series_equal(model.results.bse.round(4),
+                        expected_se.round(4))
+
+    assert(model.cov_type == 'cluster')
+    assert(model.cov_options == {'groups': ['state']})
+    assert_frame_equal(df, model.df)
+
+
+@pytest.mark.remote_data
+def test_driscoll_kraay_standard_errors():
+    df = sm.datasets.get_rdataset('PetersenCL', 'sandwich').data
+
+    # Compare examples from R docs for vcovPL function (sandwich package)
+    # (T-1 lags = 9, no correction):
+    model_1 = OLS(df, ['y'], ['x'],
+                  cov_type='hac-groupsum',
+                  cov_options={'time': ['year'],
+                               'maxlags': 9,
+                               'use_correction': False}).fit()
+    expected_1_se = pd.Series({'const': 0.01618977,
+                               'x': 0.01426121})
+    assert_series_equal(model_1.results.bse.round(4),
+                        expected_1_se.round(4))
+
+    # (2 lags, HAC correction):
+    model_2 = OLS(df, ['y'], ['x'],
+                  cov_type='hac-groupsum',
+                  cov_options={'time': ['year'],
+                               'maxlags': 2,
+                               'use_correction': 'hac'}).fit()
+    expected_2_se = pd.Series({'const': 0.02289115,
+                               'x': 0.02441980})
+    assert_series_equal(model_2.results.bse.round(4),
+                        expected_2_se.round(4))
+
+    # (1 lag, HAC correction):
+    model_3 = OLS(df, ['y'], ['x'],
+                  cov_type='hac-groupsum',
+                  cov_options={'time': ['year'],
+                               'maxlags': 1,
+                               'use_correction': 'hac'}).fit()
+    expected_3_se = pd.Series({'const': 0.02436219,
+                               'x': 0.02816896})
+    assert_series_equal(model_3.results.bse.round(4),
+                        expected_3_se.round(4))

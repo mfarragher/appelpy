@@ -4,6 +4,7 @@ import statsmodels.api as sm
 import pandas as pd
 import numpy as np
 from pandas.util.testing import (assert_series_equal,
+                                 assert_frame_equal,
                                  assert_numpy_array_equal)
 from appelpy.discrete_model import Logit
 from appelpy.utils import DummyEncoder
@@ -70,6 +71,7 @@ def test_model_not_fitted():
         model.significant_regressors(0.05)
     with pytest.raises(ValueError):
         model.predict(model.X.mean())
+    assert_frame_equal(df, model.df)
 
 
 @pytest.mark.remote_data
@@ -98,6 +100,11 @@ def test_coefficients(model_wells):
                       statsmodels.iolib.summary.Summary)
     assert isinstance(model_wells.results_output_standardized,
                       pd.io.formats.style.Styler)
+
+    # y_list & X_list
+    assert model_wells.y_list == ['switch']
+    assert model_wells.X_list == ['arsenic', 'distance', 'education',
+                                  'association']
 
 
 @pytest.mark.remote_data
@@ -138,7 +145,7 @@ def test_z_scores(model_wells):
 def test_aic(model_wells):
     expected_aic = 3917.8
     assert np.round(
-        model_wells.model_selection_stats['AIC'], 1) == expected_aic
+        model_wells.model_selection_stats['aic'], 1) == expected_aic
 
 
 @pytest.mark.remote_data

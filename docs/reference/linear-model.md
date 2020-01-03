@@ -30,7 +30,7 @@ There are three **important parameters** for initialising any model class in App
 
 - `df`: the dataframe to use for modelling.  This must have no NaN values, no infinite values, etc.
 - `y_list`: a list with the dependent variable column name.
-- `regressors_list`: a list of column names for independent variables (regressors).
+- `X_list`: a list of column names for independent variables (regressors).
 
 Other keyword arguments can be used when initialising the model class, e.g. `cov_type` to specify the type of standard errors in the model.
 
@@ -57,15 +57,15 @@ There is also a convenient `diagnostic_plot` method that consumes an OLS model o
 - P-P plot (`pp_plot`)
 - Q-Q plot (`qq_plot`)
 - Residuals vs fitted values plot (`rvf_plot`)
-- Residuals vs predicted values plot (`rvp_plot`)
+- Residuals vs predictor values plot (`rvp_plot`)
 
 Here is a useful recipe for producing a 2x2 grid of diagnostic plots with Matplotlib:
 ```python
 fig, axarr = plt.subplots(2, 2, figsize=(10, 10))
-model_nonrobust.diagnostic_plot('pp_plot', ax=axarr[0][0])
-model_nonrobust.diagnostic_plot('qq_plot', ax=axarr[0][1])
-model_nonrobust.diagnostic_plot('rvp_plot', ax=axarr[1][0])
-model_nonrobust.diagnostic_plot('rvf_plot', ax=axarr[1][1])
+model.diagnostic_plot('pp_plot', ax=axarr[0][0])
+model.diagnostic_plot('qq_plot', ax=axarr[1][0])
+model.diagnostic_plot('rvf_plot', ax=axarr[1][1])
+axarr[0, 1].axis('off')
 plt.tight_layout()
 ```
 

@@ -12,8 +12,14 @@ The main methods are:
 - `variance_inflation_factors`
 - `heteroskedasticity_test`
 - `partial_regression_plot`
+- `wald_test`
 
-There are also methods for diagnostic plots such as `pp_plot` but they are exposed more conveniently in an OLS model object method.
+There are also methods for diagnostic plots such as `pp_plot` but they are exposed more conveniently in an OLS model object method:
+
+- `pp_plot`: P-P plot
+- `qq_plot`: Q-Q plot
+- `rvf_plot`: plot of residuals against fitted values
+- `rvp_plot`: plot of residuals against values of a predictor
 
 ## `BadApples`
 The **10 Minutes To Appelpy** notebook fits a **BadApples** instance, consuming a model of the California Test Score dataset.
@@ -88,3 +94,18 @@ The method requires these parameters:
 - `appelpy_model_object`: a fitted OLS model object.
 - `df`: the dataframe used in the model.
 - `regressor`: the additional variable in the partial regression.
+
+## Wald test
+The Wald test lets you do joint testing of hypotheses, e.g.
+
+- Are the coefficients of dummy columns for a categorical variable significantly different from 0?
+- Is the difference between two regressor coefficients, e.g. `beta_u - beta_v`, significantly different from 2?
+
+Pass a list of variables to the function for straightforward joint hypothesis testing of whether a coefficient is significantly different from zero.
+
+Pass a dict for testing of hypotheses against non-zero scalars, where the values are scalars and the keys are either strings or two-item tuples e.g.
+
+```python
+hypotheses_object = {('col_u', 'col_v'): 2}  # for the difference between two coefficients
+hypotheses_object = {'col_a' : 2}
+```

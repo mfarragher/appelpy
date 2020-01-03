@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-def statistical_moments(df, kurtosis_fisher=True):
+def statistical_moments(df, *, kurtosis_fisher=True):
     """Produce a dataframe with the four main statistical moments calculated
     for each continuous variable specified in a given dataframe.
 
@@ -47,7 +47,7 @@ def statistical_moments(df, kurtosis_fisher=True):
     return df_stats
 
 
-def correlation_heatmap(df, font_size=12, ax=None):
+def correlation_heatmap(df, *, font_size=12, ax=None):
     """Produce annotated heatmap for lower triangle of correlation matrix,
     given a specified dataframe.
 

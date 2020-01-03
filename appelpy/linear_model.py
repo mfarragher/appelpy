@@ -4,7 +4,7 @@ import statsmodels.api as sm
 from statsmodels.stats.weightstats import DescrStatsW
 import matplotlib.pyplot as plt
 from .diagnostics import (plot_residuals_vs_fitted_values,
-                          plot_residuals_vs_predicted_values,
+                          plot_residuals_vs_predictor_values,
                           pp_plot, qq_plot)
 from .utils import _df_input_conditions
 __all__ = ['WLS', 'OLS']
@@ -28,7 +28,7 @@ class WLS:
             variable) or a dependent variable (endogenous variable).
         y_list (list): list containing the dependent variable,
             e.g. ['points']
-        regressors_list (list): list containing one or more regressors,
+        X_list (list): list containing one or more regressors,
             e.g. ['exper', 'age', 'coll', 'expersq']
         w (array-like object): Weights for each observation
         cov_type (str, optional): Defaults to 'nonrobust'.  Standard errors
@@ -43,6 +43,13 @@ class WLS:
             - 'HC3': robust standard errors obtained via HCCM estimates.
                 Recommended by by Long & Ervin (1999) where number of
                 observations < 250.
+        cov_options (dict, optional): Specify keyword arguments for cov_type.
+            This is a wrapper around the cov_kwds parameter in Statsmodels,
+            although column lists are used for dict values instead of Pandas
+            objects.
+            e.g. when specifying a group 'state' for clustered standard errors,
+            the form is cov_options={'groups': ['state']},
+            instead of cov_kwds={'groups': df['state']}.
         alpha (float, optional): Defaults to 0.05.  The significance level
             used for reporting confidence intervals in the model summary.
 
@@ -81,23 +88,30 @@ class WLS:
         is_fitted (Boolean): indicator for whether the model has been fitted.
 
     Attributes (auxiliary - used to store arguments):
+        df
+        y_list
+        X_list
         cov_type
+        cov_options
         w
         alpha
     """
 
-    def __init__(self, df, y_list, regressors_list, w=None,
-                 cov_type='nonrobust', alpha=0.05):
+    def __init__(self, df, y_list, X_list, *, w=None,
+                 cov_type='nonrobust', cov_options=None, alpha=0.05):
         """Initializes the WLS model object."""
         # Model inputs (attributes from arguments):
+        self._df = df
         [y_name] = y_list  # sequence unpacking in order to make Series
         self._y = df[y_name]  # Pandas Series
-        if len(regressors_list) == 1:
-            [x_name] = regressors_list
+        if len(X_list) == 1:
+            [x_name] = X_list
             self._X = df[x_name].to_frame()  # Pandas dataframe
         else:
-            self._X = df[regressors_list]  # Pandas dataframe
+            self._X = df[X_list]  # Pandas dataframe
+        self._y_list, self._X_list = y_list, X_list
         self._cov_type = cov_type
+        self._cov_options = cov_options if cov_options else {}
         if w is None:
             self._w = pd.Series(np.ones(len(self._X)))
         else:
@@ -107,6 +121,11 @@ class WLS:
 
     # MODEL INPUTS
     # These should be immutable
+    @property
+    def df(self):
+        """pd.DataFrame: source dataset"""
+        return self._df
+
     @property
     def y(self):
         """pd.Series: endogenous / dependent variable"""
@@ -121,6 +140,16 @@ class WLS:
     def w(self):
         """pd.Series: weight for each observation"""
         return self._w
+
+    @property
+    def y_list(self):
+        """list: argument for the endogenous / dependent variable"""
+        return self._y_list
+
+    @property
+    def X_list(self):
+        """list: argument for the exogenous / independent variable(s)"""
+        return self._X_list
 
     @property
     def cov_type(self):
@@ -140,6 +169,16 @@ class WLS:
             < 250.
         """
         return self._cov_type
+
+    @property
+    def cov_options(self):
+        """dict: wrapper for Statsmodels cov_kwds parameter.
+
+        The main difference though is that the dictionary values should not be
+        Pandas objects, e.g. df['state'].  They should be column lists
+        instead.
+        """
+        return self._cov_options
 
     @property
     def alpha(self):
@@ -237,7 +276,7 @@ class WLS:
         "Boolean: indicator for whether the model has been fitted."
         return self._is_fitted
 
-    def fit(self, printing=False):
+    def fit(self, *, printing=False):
         """Fit the model and save the results in the model object.
 
         Ensure the model dataset does not contain NaN values, inf
@@ -265,15 +304,20 @@ class WLS:
 
         if printing:
             print("Model fitting in progress...")
-        self._results = model.fit(cov_type=self._cov_type)
+        if self._cov_options:
+            self._results = model.fit(cov_type=self._cov_type,
+                                      cov_kwds=self._get_cov_kwds())
+        else:
+            self._results = model.fit(cov_type=self._cov_type)
+
         self._results_output = self._results.summary(alpha=self._alpha)
         self._resid = self._results.resid
 
-        model_selection_dict = {"Root MSE": np.sqrt(self._results.mse_resid),
-                                "R-squared": self._results.rsquared,
-                                "R-squared (adj)": self._results.rsquared_adj,
-                                "AIC": self._results.aic,
-                                "BIC": self._results.bic}
+        model_selection_dict = {"root_mse": np.sqrt(self._results.mse_resid),
+                                "r_squared": self._results.rsquared,
+                                "r_squared_adj": self._results.rsquared_adj,
+                                "aic": self._results.aic,
+                                "bic": self._results.bic}
         self._model_selection_stats = model_selection_dict
 
         self._standardize_results()
@@ -360,7 +404,7 @@ class WLS:
 
         return mean_Xw, mean_yw, std_Xw, std_yw
 
-    def predict(self, X_predict, within_sample=True):
+    def predict(self, X_predict, *, within_sample=True):
         """Predict the value(s) of given example(s) based on the fitted model.
 
         The prediction for an example will return as NaN if:
@@ -462,7 +506,8 @@ class WLS:
         else:
             return regressor_pvalues.iloc[indices_significant].index.to_list()
 
-    def diagnostic_plot(self, plot_name, ax=None):
+    def diagnostic_plot(self, plot_name, *, ax=None,
+                        predictor=None):
         """Return a regression diagnostic plot.
 
         Recommended code block for plotting:
@@ -477,10 +522,13 @@ class WLS:
             plot_name (str): A regression diagnostic plot from:
                 - 'pp_plot': P-P plot
                 - 'qq_plot': Q-Q plot
-                - 'rvp_plot': plot of residuals against predicted values.
                 - 'rvf_plot': plot of residuals against fitted values.
+                - 'rvp_plot': plot of residuals against values of a predictor
+                    (note: 'predictor' keyword argument must be specified).
             ax (Axes, optional): Defaults to None.  An Axes argument
                 to use for plotting.
+            predictor (str): Defaults to None - required only when calling
+                up an 'rvp_plot'.  Specify a regressor for an 'rvp_plot'.
 
         Returns:
             Figure: the plot as a Matplotlib Figure object.
@@ -491,20 +539,24 @@ class WLS:
         if plot_name not in ['pp_plot', 'qq_plot', 'rvf_plot', 'rvp_plot']:
             raise ValueError(
                 "Ensure that a valid plot_name is passed to the method.")
+        if plot_name == 'rvp_plot' and not predictor:
+            raise ValueError("Ensure that a regressor is specified when calling rvp_plot.")
+        if plot_name == 'rvp_plot' and predictor not in self.X_list:
+            raise ValueError("Ensure that the regressor is in X_list.")
 
         if ax is None:
             ax = plt.gca()
 
         if plot_name == 'pp_plot':
-            fig = pp_plot(self.results.resid, ax)
+            fig = pp_plot(self.results.resid, ax=ax)
         if plot_name == 'qq_plot':
-            fig = qq_plot(self.results.resid, ax)
+            fig = qq_plot(self.results.resid, ax=ax)
         if plot_name == 'rvf_plot':
             fig = plot_residuals_vs_fitted_values(
-                self._y, self.results.resid, ax)
+                self.results.resid, self.results.fittedvalues, ax=ax)
         if plot_name == 'rvp_plot':
-            fig = plot_residuals_vs_predicted_values(
-                self.predict(self._X.to_numpy()), self.results.resid, ax)
+            fig = plot_residuals_vs_predictor_values(
+                self, predictor=predictor, ax=ax)
         return fig
 
 
@@ -526,7 +578,7 @@ class OLS(WLS):
             variable) or a dependent variable (endogenous variable).
         y_list (list): list containing the dependent variable,
             e.g. ['points']
-        regressors_list (list): list containing one or more regressors,
+        X_list (list): list containing one or more regressors,
             e.g. ['exper', 'age', 'coll', 'expersq']
         cov_type (str, optional): Defaults to 'nonrobust'.  Standard errors
             type.
@@ -540,6 +592,13 @@ class OLS(WLS):
             - 'HC3': robust standard errors obtained via HCCM estimates.
                 Recommended by by Long & Ervin (1999) where number of
                 observations < 250.
+        cov_options (dict, optional): Specify keyword arguments for cov_type.
+            This is a wrapper around the cov_kwds parameter in Statsmodels,
+            although column lists are used for dict values instead of Pandas
+            objects.
+            e.g. when specifying a group 'state' for clustered standard errors,
+            the form is cov_options={'groups': ['state']},
+            instead of cov_kwds={'groups': df['state']}.
         alpha (float, optional): Defaults to 0.05.  The significance level
             used for reporting confidence intervals in the model summary.
 
@@ -577,28 +636,33 @@ class OLS(WLS):
             standardized estimates.
         is_fitted (Boolean): indicator for whether the model has been fitted.
     Attributes (auxiliary - used to store arguments):
+        df
         cov_type
+        cov_options
         alpha
         w
     """
 
-    def __init__(self, df, y_list, regressors_list,
-                 cov_type='nonrobust', alpha=0.05):
+    def __init__(self, df, y_list, X_list, *,
+                 cov_type='nonrobust', cov_options=None, alpha=0.05):
         """Initializes the OLS model object."""
         # Model inputs (attributes from arguments):
+        self._df = df
         [y_name] = y_list  # sequence unpacking in order to make Series
         self._y = df[y_name]  # Pandas Series
-        if len(regressors_list) == 1:
-            [x_name] = regressors_list
+        if len(X_list) == 1:
+            [x_name] = X_list
             self._X = df[x_name].to_frame()  # Pandas dataframe
         else:
-            self._X = df[regressors_list]  # Pandas dataframe
+            self._X = df[X_list]  # Pandas dataframe
+        self._y_list, self._X_list = y_list, X_list
         self._w = pd.Series(np.ones(len(self._X)))
         self._cov_type = cov_type
+        self._cov_options = cov_options if cov_options else {}
         self._alpha = alpha
         self._is_fitted = False
 
-    def fit(self, printing=False):
+    def fit(self, *, printing=False):
         """Fit the model and save the results in the model object.
 
         Ensure the model dataset does not contain NaN values, inf
@@ -625,15 +689,20 @@ class OLS(WLS):
 
         if printing:
             print("Model fitting in progress...")
-        self._results = model.fit(cov_type=self._cov_type)
+        if self._cov_options:
+            self._results = model.fit(cov_type=self._cov_type,
+                                      cov_kwds=self._get_cov_kwds())
+        else:
+            self._results = model.fit(cov_type=self._cov_type)
+
         self._results_output = self._results.summary(alpha=self._alpha)
         self._resid = self._results.resid
 
-        model_selection_dict = {"Root MSE": np.sqrt(self._results.mse_resid),
-                                "R-squared": self._results.rsquared,
-                                "R-squared (adj)": self._results.rsquared_adj,
-                                "AIC": self._results.aic,
-                                "BIC": self._results.bic}
+        model_selection_dict = {"root_mse": np.sqrt(self._results.mse_resid),
+                                "r_squared": self._results.rsquared,
+                                "r_squared_adj": self._results.rsquared_adj,
+                                "aic": self._results.aic,
+                                "bic": self._results.bic}
         self._model_selection_stats = model_selection_dict
 
         self._standardize_results()
@@ -663,7 +732,12 @@ class OLS(WLS):
         # Model fitting
         model_standardized = sm.OLS(self._y_standardized,
                                     sm.add_constant(self._X_standardized))
-        results_obj = model_standardized.fit(cov_type=self._cov_type)
+        if self._cov_options:
+            results_obj = model_standardized.fit(cov_type=self._cov_type,
+                                                 cov_kwds=self._get_cov_kwds())
+        else:
+            results_obj = model_standardized.fit(cov_type=self._cov_type)
+
         self._resid_standardized = pd.Series((self._results.get_influence()
                                               .resid_studentized_internal),
                                              index=self._resid.index,
@@ -704,3 +778,19 @@ class OLS(WLS):
             "Unstandardized and Standardized Estimates")
         self._results_output_standardized = std_results_output
         pass
+
+    def _get_cov_kwds(self):
+        # Appelpy cov_options -> Statsmodels cov_kwds
+        cov_kwds = self._cov_options.copy()
+
+        # 'groups' list -> Pandas dataframe/series
+        if 'groups' in self._cov_options:
+            cov_kwds['groups'] = (self._df.loc[:, self._cov_options['groups']]
+                                  .copy())
+
+        # 'time' list -> Numpy array
+        if 'time' in self._cov_options:
+            cov_kwds['time'] = (self._df.loc[:, self._cov_options['time']]
+                                .to_numpy().squeeze())
+
+        return cov_kwds

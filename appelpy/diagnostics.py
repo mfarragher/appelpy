@@ -6,55 +6,27 @@ import statsmodels.stats.api as sms
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+
 __all__ = ['BadApples',
+           'plot_residuals_vs_predictor_values',
            'plot_residuals_vs_fitted_values',
-           'plot_residuals_vs_predicted_values',
            'pp_plot', 'qq_plot',
            'variance_inflation_factors',
            'heteroskedasticity_test',
            'partial_regression_plot']
 
 
-def plot_residuals_vs_fitted_values(residual_values, fitted_values,
+def plot_residuals_vs_fitted_values(residual_values, fitted_values, *,
                                     ax=None):
-    """Plot a model's residual values (y-axis) on the fitted values
-    (x-axis).
-
-    The plot is a useful diagnostic to assess whether there is
-    heteroskedasticity or outliers in the data.
-
-    Args:
-        residual_values (array): array of residuals from a model
-        fitted_values (array): array of fitted values (y-fit)
-        ax (Axes object): Matplotlib Axes object (optional)
-
-    Returns:
-        Figure object
-    """
-
-    if ax is None:
-        ax = plt.gca()
-    chart_plot = sns.regplot(residual_values, fitted_values,
-                             ax=ax, fit_reg=False)
-    fig = chart_plot.figure
-    ax.grid(True, linewidth=0.5)
-    ax.set_title("Residuals vs Fitted Values Plot")
-    ax.set_xlabel("Fitted Values")
-    ax.set_ylabel("Residuals")
-    return fig
-
-
-def plot_residuals_vs_predicted_values(residual_values, predicted_values,
-                                       ax=None):
-    """Plot a model's residual values (y-axis) on the predicted values
-    (x-axis).
+    """Plot a model's residual values (y-axis) on the fitted / predicted
+    values (x-axis).
 
     The plot is a useful diagnostic to assess whether the assumption of
     linearity holds for a model.
 
     Args:
         residual_values (array): array of residuals from a model
-        predicted_values (array): array of fitted values (y-pred)
+        fitted_values (array): array of fitted values (y_hat)
         ax (Axes object): Matplotlib Axes object (optional)
 
     Returns:
@@ -62,17 +34,48 @@ def plot_residuals_vs_predicted_values(residual_values, predicted_values,
     """
     if ax is None:
         ax = plt.gca()
-    chart_plot = sns.regplot(residual_values, predicted_values,
+    chart_plot = sns.regplot(fitted_values, residual_values,
                              ax=ax, fit_reg=False)
     fig = chart_plot.figure
     ax.grid(True, linewidth=0.5)
-    ax.set_title("Residuals vs Predicted Values Plot")
-    ax.set_xlabel("Predicted Values")
+    ax.set_title("Residuals vs Fitted Values Plot")
+    ax.set_xlabel(r"Fitted Values ($\^{y}$)")
     ax.set_ylabel("Residuals")
     return fig
 
 
-def pp_plot(residual_values, ax=None):
+def plot_residuals_vs_predictor_values(appelpy_model_object, *, predictor,
+                                       ax=None):
+    """Plot a model's residual values (y-axis) on the values of a predictor/
+    regressor (x-axis).
+
+    Args:
+        appelpy_model_object: the object that contains the info about a model
+            fitted with Appelpy.  e.g. for OLS regression the object would
+            be of the type appelpy.linear_model.OLS.
+        predictor (str): name of a column/regressor in the model, i.e.
+            one of the columns in the model's X_list.
+        ax (Axes object): Matplotlib Axes object (optional)
+
+    Returns:
+        Figure object
+    """
+    if predictor not in appelpy_model_object.X_list:
+        raise ValueError("Predictor not found in model's X columns.")
+    if ax is None:
+        ax = plt.gca()
+    chart_plot = sns.regplot(appelpy_model_object.df.loc[:, predictor],
+                             appelpy_model_object.results.resid,
+                             ax=ax, fit_reg=False)
+    fig = chart_plot.figure
+    ax.grid(True, linewidth=0.5)
+    ax.set_title("Residuals vs Predictor Values Plot\n{}".format(predictor))
+    ax.set_xlabel("{}".format(predictor))
+    ax.set_ylabel("Residuals")
+    return fig
+
+
+def pp_plot(residual_values, *, ax=None):
     """P-P plot compares the empirical cumulative distribution function
     against the theoretical cumulative distribution function given a
     specified model.
@@ -99,7 +102,7 @@ def pp_plot(residual_values, ax=None):
     return fig
 
 
-def qq_plot(residual_values, ax=None):
+def qq_plot(residual_values, *, ax=None):
     """Q-Q plot compares the quantiles of a distribution against the
     quantiles of the theoretical distribution given a specified model.
 
@@ -124,7 +127,7 @@ def qq_plot(residual_values, ax=None):
     return fig
 
 
-def variance_inflation_factors(X, vif_threshold=10):
+def variance_inflation_factors(X, *, vif_threshold=10):
     """Returns a DataFrame with variance inflation factor (VIF) values
     calculated given a matrix of regressor values (X).
 
@@ -159,7 +162,7 @@ def variance_inflation_factors(X, vif_threshold=10):
     return pd.concat([vif, tol, vif_thres], axis='columns')
 
 
-def partial_regression_plot(appelpy_model_object, df, regressor,
+def partial_regression_plot(appelpy_model_object, df, regressor, *,
                             annotate_results=False, ax=None):
     """Also known as the added variable plot, the partial regression plot
     shows the effect of adding another regressor (independent variable)
@@ -307,7 +310,6 @@ class BadApples:
         appelpy_model_object
         y
         X
-
     """
 
     def __init__(self, appelpy_model_object):
@@ -432,7 +434,7 @@ class BadApples:
 
         pass
 
-    def fit(self, printing=False):
+    def fit(self, *, printing=False):
         """Calculate the influence, outlier and leverage measures for the
         given model.  The method call also calculates the heuristics for
         determining which observations have 'extreme' values for the measures.
@@ -468,7 +470,7 @@ class BadApples:
         df = pd.concat([self._y, self._X], axis='columns')
         return df[df.index.isin(extreme_indices_list)].copy()
 
-    def _calculate_leverage_vs_residuals_squared(self, rescale=False):
+    def _calculate_leverage_vs_residuals_squared(self, *, rescale=False):
         df = pd.DataFrame(index=self._measures_leverage.index,
                           columns=['leverage', 'resid_score'])
         df['leverage'] = self._measures_leverage
@@ -483,7 +485,7 @@ class BadApples:
 
         return df
 
-    def plot_leverage_vs_residuals_squared(self, annotate=False,
+    def plot_leverage_vs_residuals_squared(self, *, annotate=False,
                                            rescale=False, ax=None):
         """Produce a scatterplot of observations' leverage values
         (y-axis) on their normalized residuals squared (x-axis).  In
@@ -553,9 +555,15 @@ class BadApples:
         return fig
 
 
-def heteroskedasticity_test(test_name, appelpy_model_object,
+def heteroskedasticity_test(test_name, appelpy_model_object, *,
                             regressors_subset=None):
     """Return the results of a heteroskedasticity test given a model.
+
+    Output is a dictionary with with these keys:
+    - 'distribution' (str): the distribution of the test
+    - 'nu' (int): the number of degrees of freedom for the test
+    - 'test_stat' (float): the value of the test statistic
+    - 'p_value' (float): the p-value for the test
 
     Supported tests:
     - 'breusch_pagan': equivalent to Stata's `hettest` command.
@@ -579,14 +587,17 @@ def heteroskedasticity_test(test_name, appelpy_model_object,
         ValueError: Check the regressors_subset items were used in the model.
 
     Returns:
-        test_statistic, p_value: the test statistic and the corresponding
-            p-value.
+        dict: info for the test, e.g. test distribution, degrees of freedom,
+            test statistic and p-value.
     """
+
+    # Gather test info in a dict:
+    test_summary = {'distribution': 'chi2'}
 
     if test_name == 'breusch_pagan':
         # Get residuals (from model object or run again on a regressors subset)
         if regressors_subset:
-            if not set(regressors_subset).issubset(set(appelpy_model_object.X.columns)):
+            if not set(regressors_subset).issubset(set(appelpy_model_object.X_list)):
                 raise ValueError(
                     'Regressor(s) not recognised in dataset.  Check the list given to the function.')
             reduced_model = sm.OLS(appelpy_model_object.y,
@@ -604,31 +615,149 @@ def heteroskedasticity_test(test_name, appelpy_model_object,
         aux_model = sm.OLS(scaled_sq_resid, sm.add_constant(y_hat)).fit()
 
         # Calculate test stat and pval
-        lm = aux_model.ess / 2
-        pval = sp.stats.chi2.sf(lm, 1)  # dof=1
-        return lm, pval
+        test_summary['nu'] = 1
+        test_summary['test_stat'] = aux_model.ess / 2
+        test_summary['p_value'] = sp.stats.chi2.sf(
+            test_summary['test_stat'], test_summary['nu'])
     elif test_name == 'breusch_pagan_studentized':
         if regressors_subset:
-            if not set(regressors_subset).issubset(set(appelpy_model_object.X.columns)):
+            if not set(regressors_subset).issubset(set(appelpy_model_object.X_list)):
                 raise ValueError(
                     'Regressor(s) not recognised in dataset.  Check the list given to the function.')
             reduced_model = sm.OLS(appelpy_model_object.y,
                                    sm.add_constant(appelpy_model_object.X[regressors_subset]))
             reduced_model_results = reduced_model.fit()
-            lm, pval, _, _ = sms.het_breuschpagan(reduced_model_results.resid,
-                                                  reduced_model_results.model.exog)
-            return lm, pval
+            test_summary['nu'] = 1
+            stat, pval, _, _ = sms.het_breuschpagan(reduced_model_results.resid,
+                                                    reduced_model_results.model.exog)
+            test_summary['test_stat'], test_summary['p_value'] = stat, pval
         else:
-            lm, pval, _, _ = sms.het_breuschpagan(appelpy_model_object.results.resid,
-                                                  appelpy_model_object.results.model.exog)
-            return lm, pval
+            test_summary['nu'] = 1
+            stat, pval, _, _ = sms.het_breuschpagan(appelpy_model_object.results.resid,
+                                                    appelpy_model_object.results.model.exog)
+            test_summary['test_stat'], test_summary['p_value'] = stat, pval
     elif test_name == 'white':
         if regressors_subset:
             print("Ignoring regressors_subset.  White test will use original regressors.")
+        test_summary['nu'] = (
+            int((len(appelpy_model_object.X_list) ** 2
+                + 3 * len(appelpy_model_object.X_list))
+                / 2))
         white_test = sms.het_white(appelpy_model_object.resid,
                                    sm.add_constant(appelpy_model_object.X))
-        return white_test[0], white_test[1]  # lm, pval
+        test_summary['test_stat'] = white_test[0]
+        test_summary['p_value'] = white_test[1]
     else:
         raise ValueError(
             """Choose one of 'breusch_pagan', 'breusch_pagan_studentized' or
             'white' as a test name.""")
+
+    return test_summary
+
+
+def wald_test(appelpy_model_object, hypotheses_object):
+    """Undertake a Wald test for joint testing of multiple hypotheses, given
+    a model.
+
+    Output is a dictionary with with these keys:
+    - 'distribution' (str): the distribution of the test
+    - 'nu' (int): the number of degrees of freedom for the test
+    - 'test_stat' (float): the value of the test statistic
+    - 'p_value' (float): the p-value for the test
+
+    These are examples of hypotheses setups that can be tested:
+    - Joint test on whether the coefficients of col_a and col_b are
+    significantly different from 0.
+        hypotheses_object -> ['col_a', 'col_b']
+        Object can take a LIST for testing of coefficients against 0.
+    - Test of whether the coefficients of columns are significantly different
+    from a scalar, e.g. 20.
+        hypotheses_object -> {'col_a': 20}
+        Object can take a DICT when non-zero values for coefficients are
+        tested.
+    - Test of whether the difference between col_a and col_b is significantly
+    different from a scalar, e.g. 10
+        hypotheses_object -> {('col_a', 'col_b): 10}
+        OBJECT can take a DICT, where the key is a tuple of two column strings,
+        when a difference between two coefficients is tested.
+
+    Args:
+        appelpy_model_object: the object that contains the info about a
+            model fitted with Appelpy.  e.g. for OLS regression the object
+            would be of the type appelpy.linear_model.OLS.
+        hypotheses_object (list or dict): for tests on whether all the passed
+            regressors have a coefficient of 0, pass a LIST,
+            e.g. ['str', 'elpct']
+            In this case the initial hypotheses being jointly tested are:
+                - `elpct` = 0
+                - `str` = 0
+
+            For more complex cases (e.g. test whether two regressors have same
+            coefficient; test coefficient against a non-zero scalar), pass a
+            DICT, where the key is a regressor or a tuple of regressors and
+            the value is a scalar,
+            e.g. {('GNPDEFL', 'GNP'): 0, 'UNEMP': 2, 'YEAR': 1829}
+            for the Longley dataset.
+            In this case, the initial hypotheses being jointly tested are:
+                - `GNPDEFL` - `GNP` = 0 (first item of tuple minus second item)
+                - `YEAR` = 1829
+                - `UNEMP` = 2
+
+    Raises:
+        ValueError or TypeError where the hypotheses_object is a bad argument.
+            e.g. column not found in model object; not a dict or list; dict
+            has invalid keys or values.
+
+    Returns:
+        dict: info for the test, e.g. test distribution, degrees of freedom,
+            test statistic and p-value.
+    """
+
+    hypotheses = []  # list for collecting hypotheses
+    if isinstance(hypotheses_object, list):
+        for x in hypotheses_object:
+            if x not in appelpy_model_object.X_list:
+                raise ValueError("Column '{}' not found in the fitted model.".format(x))
+            hypotheses.append('({} = 0)'.format(x))
+    elif isinstance(hypotheses_object, dict):
+        for k, v in hypotheses_object.items():
+            # Check value:
+            if not isinstance(v, (float, int)):
+                raise TypeError("Check that the input dictionary's values are numeric.")
+
+            # Check key:
+            if isinstance(k, tuple):
+                if not set(k).issubset(set(appelpy_model_object.X_list)):
+                    raise ValueError("Check that the column names given are in the fitted model.")
+                elif len(k) > 2:
+                    raise ValueError("Ensure that only two column names are given in an input tuple.")
+                else:
+                    hypotheses.append('({} - {} = {})'.format(k[0], k[1], v))
+            elif isinstance(k, str):
+                if k not in appelpy_model_object.X_list:
+                    raise ValueError("Check that the column names given are in the fitted model.")
+                else:
+                    hypotheses.append('({} = {})'.format(k, v))
+            else:
+                raise TypeError("Ensure input dictionary's keys are either strings or 2-item tuples of strings.")
+    else:
+        raise TypeError("Specify either a dict or a list for the hypotheses_object.")
+
+    hypotheses_str = ', '.join(hypotheses)  # '(hyp1), ..., (hypN)' form
+
+    # Get the Statsmodels Wald test object for the specified hypotheses:
+    # calculate F statistic (e.g. for OLS)
+    if appelpy_model_object.results.use_t:
+        test_results = appelpy_model_object.results.wald_test(hypotheses_str,
+                                                              use_f=True)
+    else:  # calculate chi2 statistic (e.g. for Logit as dispersion param = 1)
+        test_results = appelpy_model_object.results.wald_test(hypotheses_str,
+                                                              use_f=False)
+
+    # Gather test info in a dict:
+    test_summary = {}
+    test_summary['distribution'] = test_results.distribution
+    test_summary['nu'] = len(hypotheses_object)
+    test_summary['test_stat'] = test_results.statistic.flatten()[0]
+    test_summary['p_value'] = test_results.pvalue.flatten()[0]
+    return test_summary

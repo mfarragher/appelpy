@@ -83,6 +83,13 @@ def test_coefficients(model_salaries):
     assert isinstance(model_salaries.results_output_standardized,
                       pd.io.formats.style.Styler)
 
+    # y_list & X_list
+    assert model_salaries.y_list == ['salary']
+    assert model_salaries.X_list == ['rank_AssocProf', 'rank_Prof',
+                                     'discipline_B',
+                                     'yrs_since_phd', 'yrs_service',
+                                     'sex_Male']
+
 
 @pytest.mark.remote_data
 def test_standard_errors(model_salaries):
@@ -97,6 +104,7 @@ def test_standard_errors(model_salaries):
                         expected_se)
 
     assert(model_salaries.cov_type == 'nonrobust')
+    assert(model_salaries.cov_options == {})
 
 
 @pytest.mark.remote_data
@@ -120,13 +128,13 @@ def test_model_selection_stats(model_salaries):
     expected_r_squared_adj = 0.9977
 
     assert(np.round((model_salaries
-                     .model_selection_stats['Root MSE']), 3)
+                     .model_selection_stats['root_mse']), 3)
            == expected_root_mse)
     assert(np.round((model_salaries
-                     .model_selection_stats['R-squared']), 4)
+                     .model_selection_stats['r_squared']), 4)
            == expected_r_squared)
     assert(np.round((model_salaries
-                     .model_selection_stats['R-squared (adj)']), 4)
+                     .model_selection_stats['r_squared_adj']), 4)
            == expected_r_squared_adj)
 
 
