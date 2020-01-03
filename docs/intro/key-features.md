@@ -32,10 +32,11 @@
 ## Model diagnostics
 It's easy enough to fit a model in Statsmodels.  Where Appelpy shines is the ability to do diagnostics using only the model object, instead of having to call multiple methods scattered across a library.  These are some diagnostics available:
 
-- One method for calling **diagnostic plots** to assess whether OLS assumptions hold in a model, e.g. `model.diagnostic_plot('rvp_plot')`.  The plots are similar to commands available in Stata, but here they are accessible within the Appelpy OLS model object.
+- One method for calling **diagnostic plots** to assess whether OLS assumptions hold in a model, e.g. `model.diagnostic_plot('rvf_plot')`.  The plots are similar to commands available in Stata, but here they are accessible within the Appelpy OLS model object.
 - `BadApples` class does a decomposition of influence analysis into three parts: leverage, outlier and influence measures.  The leverage vs residuals squared plot (similar to Stata's `lvr2plot`) can also be called from an instance of the class.
 - Identify extreme observations in a model based on common heuristics.
 - Perform diagnostics not implemented in the main Python libraries, e.g. studentized Breusch–Pagan test of heteroskedasticity.
+- Joint hypothesis testing, using built-in Python data structures (lists & dicts).
 
 ![OLS diagnostics plot](../img/2x2-diagnostics-ols.png)
 
