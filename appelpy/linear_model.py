@@ -4,7 +4,7 @@ import statsmodels.api as sm
 from statsmodels.stats.weightstats import DescrStatsW
 import matplotlib.pyplot as plt
 from .diagnostics import (plot_residuals_vs_fitted_values,
-                          plot_residuals_vs_predicted_values,
+                          plot_residuals_vs_predictor_values,
                           pp_plot, qq_plot)
 from .utils import _df_input_conditions
 __all__ = ['WLS', 'OLS']
@@ -48,7 +48,7 @@ class WLS:
             although column lists are used for dict values instead of Pandas
             objects.
             e.g. when specifying a group 'state' for clustered standard errors,
-            the form is cov_options={'groups': 'state'},
+            the form is cov_options={'groups': ['state']},
             instead of cov_kwds={'groups': df['state']}.
         alpha (float, optional): Defaults to 0.05.  The significance level
             used for reporting confidence intervals in the model summary.
@@ -174,7 +174,7 @@ class WLS:
     def cov_options(self):
         """dict: wrapper for Statsmodels cov_kwds parameter.
 
-        The main different though is that the dictionary values should not be
+        The main difference though is that the dictionary values should not be
         Pandas objects, e.g. df['state'].  They should be column lists
         instead.
         """
@@ -506,7 +506,8 @@ class WLS:
         else:
             return regressor_pvalues.iloc[indices_significant].index.to_list()
 
-    def diagnostic_plot(self, plot_name, *, ax=None):
+    def diagnostic_plot(self, plot_name, *, ax=None,
+                        predictor=None):
         """Return a regression diagnostic plot.
 
         Recommended code block for plotting:
@@ -521,10 +522,13 @@ class WLS:
             plot_name (str): A regression diagnostic plot from:
                 - 'pp_plot': P-P plot
                 - 'qq_plot': Q-Q plot
-                - 'rvp_plot': plot of residuals against predicted values.
                 - 'rvf_plot': plot of residuals against fitted values.
+                - 'rvp_plot': plot of residuals against values of a predictor
+                    (note: 'predictor' keyword argument must be specified).
             ax (Axes, optional): Defaults to None.  An Axes argument
                 to use for plotting.
+            predictor (str): Defaults to None - required only when calling
+                up an 'rvp_plot'.  Specify a regressor for an 'rvp_plot'.
 
         Returns:
             Figure: the plot as a Matplotlib Figure object.
@@ -535,6 +539,10 @@ class WLS:
         if plot_name not in ['pp_plot', 'qq_plot', 'rvf_plot', 'rvp_plot']:
             raise ValueError(
                 "Ensure that a valid plot_name is passed to the method.")
+        if plot_name == 'rvp_plot' and not predictor:
+            raise ValueError("Ensure that a regressor is specified when calling rvp_plot.")
+        if plot_name == 'rvp_plot' and predictor not in self.X_list:
+            raise ValueError("Ensure that the regressor is in X_list.")
 
         if ax is None:
             ax = plt.gca()
@@ -545,10 +553,10 @@ class WLS:
             fig = qq_plot(self.results.resid, ax=ax)
         if plot_name == 'rvf_plot':
             fig = plot_residuals_vs_fitted_values(
-                self._y, self.results.resid, ax=ax)
+                self.results.resid, self.results.fittedvalues, ax=ax)
         if plot_name == 'rvp_plot':
-            fig = plot_residuals_vs_predicted_values(
-                self.predict(self._X.to_numpy()), self.results.resid, ax=ax)
+            fig = plot_residuals_vs_predictor_values(
+                self, predictor=predictor, ax=ax)
         return fig
 
 
@@ -589,7 +597,7 @@ class OLS(WLS):
             although column lists are used for dict values instead of Pandas
             objects.
             e.g. when specifying a group 'state' for clustered standard errors,
-            the form is cov_options={'groups': 'state'},
+            the form is cov_options={'groups': ['state']},
             instead of cov_kwds={'groups': df['state']}.
         alpha (float, optional): Defaults to 0.05.  The significance level
             used for reporting confidence intervals in the model summary.

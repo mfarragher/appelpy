@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 
 
 __all__ = ['BadApples',
+           'plot_residuals_vs_predictor_values',
            'plot_residuals_vs_fitted_values',
-           'plot_residuals_vs_predicted_values',
            'pp_plot', 'qq_plot',
            'variance_inflation_factors',
            'heteroskedasticity_test',
@@ -18,44 +18,15 @@ __all__ = ['BadApples',
 
 def plot_residuals_vs_fitted_values(residual_values, fitted_values, *,
                                     ax=None):
-    """Plot a model's residual values (y-axis) on the fitted values
-    (x-axis).
-
-    The plot is a useful diagnostic to assess whether there is
-    heteroskedasticity or outliers in the data.
-
-    Args:
-        residual_values (array): array of residuals from a model
-        fitted_values (array): array of fitted values (y-fit)
-        ax (Axes object): Matplotlib Axes object (optional)
-
-    Returns:
-        Figure object
-    """
-
-    if ax is None:
-        ax = plt.gca()
-    chart_plot = sns.regplot(residual_values, fitted_values,
-                             ax=ax, fit_reg=False)
-    fig = chart_plot.figure
-    ax.grid(True, linewidth=0.5)
-    ax.set_title("Residuals vs Fitted Values Plot")
-    ax.set_xlabel("Fitted Values")
-    ax.set_ylabel("Residuals")
-    return fig
-
-
-def plot_residuals_vs_predicted_values(residual_values, predicted_values, *,
-                                       ax=None):
-    """Plot a model's residual values (y-axis) on the predicted values
-    (x-axis).
+    """Plot a model's residual values (y-axis) on the fitted / predicted
+    values (x-axis).
 
     The plot is a useful diagnostic to assess whether the assumption of
     linearity holds for a model.
 
     Args:
         residual_values (array): array of residuals from a model
-        predicted_values (array): array of fitted values (y-pred)
+        fitted_values (array): array of fitted values (y_hat)
         ax (Axes object): Matplotlib Axes object (optional)
 
     Returns:
@@ -63,12 +34,43 @@ def plot_residuals_vs_predicted_values(residual_values, predicted_values, *,
     """
     if ax is None:
         ax = plt.gca()
-    chart_plot = sns.regplot(residual_values, predicted_values,
+    chart_plot = sns.regplot(fitted_values, residual_values,
                              ax=ax, fit_reg=False)
     fig = chart_plot.figure
     ax.grid(True, linewidth=0.5)
-    ax.set_title("Residuals vs Predicted Values Plot")
-    ax.set_xlabel("Predicted Values")
+    ax.set_title("Residuals vs Fitted Values Plot")
+    ax.set_xlabel(r"Fitted Values ($\^{y}$)")
+    ax.set_ylabel("Residuals")
+    return fig
+
+
+def plot_residuals_vs_predictor_values(appelpy_model_object, *, predictor,
+                                       ax=None):
+    """Plot a model's residual values (y-axis) on the values of a predictor/
+    regressor (x-axis).
+
+    Args:
+        appelpy_model_object: the object that contains the info about a model
+            fitted with Appelpy.  e.g. for OLS regression the object would
+            be of the type appelpy.linear_model.OLS.
+        predictor (str): name of a column/regressor in the model, i.e.
+            one of the columns in the model's X_list.
+        ax (Axes object): Matplotlib Axes object (optional)
+
+    Returns:
+        Figure object
+    """
+    if predictor not in appelpy_model_object.X_list:
+        raise ValueError("Predictor not found in model's X columns.")
+    if ax is None:
+        ax = plt.gca()
+    chart_plot = sns.regplot(appelpy_model_object.df.loc[:, predictor],
+                             appelpy_model_object.results.resid,
+                             ax=ax, fit_reg=False)
+    fig = chart_plot.figure
+    ax.grid(True, linewidth=0.5)
+    ax.set_title("Residuals vs Predictor Values Plot\n{}".format(predictor))
+    ax.set_xlabel("{}".format(predictor))
     ax.set_ylabel("Residuals")
     return fig
 
@@ -308,7 +310,6 @@ class BadApples:
         appelpy_model_object
         y
         X
-
     """
 
     def __init__(self, appelpy_model_object):

@@ -8,8 +8,8 @@ from pandas.util.testing import (assert_series_equal, assert_frame_equal,
                                  assert_numpy_array_equal)
 from appelpy.diagnostics import (BadApples,
                                  partial_regression_plot, pp_plot, qq_plot,
-                                 plot_residuals_vs_predicted_values,
-                                 plot_residuals_vs_fitted_values)
+                                 plot_residuals_vs_fitted_values,
+                                 plot_residuals_vs_predictor_values)
 from appelpy.linear_model import OLS
 import matplotlib
 
@@ -36,38 +36,45 @@ def model_mtcars_short():
 
 
 @pytest.mark.remote_data
-def test_rvf_plot(model_mtcars_short):
+def test_rvp_plot(model_mtcars_short):
     _reset_matplotlib()
     # Expected data, with x-vals sorted in asc order
     sorted_expected_data = (
-        np.array([[10.4, 10.4, 13.3, 14.3, 14.7, 15.,
-                   15.2, 15.2, 15.5, 15.8, 16.4, 17.3,
-                   17.8, 18.1, 18.7, 19.2, 19.2, 19.7,
-                   21., 21., 21.4, 21.4, 21.5, 22.8,
-                   22.8, 24.4, 26., 27.3, 30.4, 30.4,
-                   32.4, 33.9],
-                  [-0.14576, -0.86805, -2.18265, -2.23902,  4.01648, -1.09811,
-                   0.0537, -1.41135, -0.90694, -2.12603,  2.30804,  1.97191,
-                   -1.34375, -1.39998,  1.68835,  0.05625,  3.36188, -1.71077,
-                   -1.06821, -0.14111,  0.76267, -3.36495, -4.40346, -0.76771,
-                   -3.54021,  0.93363, -1.08655, -0.22323,  1.2222,  1.73801,
-                   5.84247,  6.07224]])).T
+        np.array([
+            [1.513, 1.615, 1.835, 1.935, 2.14, 2.2, 2.32, 2.465, 2.62,
+             2.77, 2.78, 2.875, 3.15, 3.17, 3.19, 3.215, 3.435, 3.44,
+             3.44, 3.44, 3.46, 3.52, 3.57, 3.57, 3.73, 3.78, 3.84,
+             3.845, 4.07, 5.25, 5.345, 5.424],
+            [1.2222,  1.73801,  6.07224, -0.22323, -1.08655,  5.84247,
+             -3.54021, -4.40346, -1.06821, -1.71077, -3.36495, -0.14111,
+             -0.76771, -2.12603,  0.93363,  0.76267, -1.41135,  0.05625,
+             1.68835, -1.34375, -1.39998, -0.90694, -2.23902, -1.09811,
+             1.97191,  0.0537, -2.18265,  3.36188,  2.30804, -0.86805,
+             4.01648, -0.14576]])).T
+
+    with pytest.raises(ValueError):
+        model_mtcars_short.diagnostic_plot('rvpplot', predictor='wt')
+    with pytest.raises(ValueError):
+        model_mtcars_short.diagnostic_plot('rvp_plot')
+    with pytest.raises(ValueError):
+        model_mtcars_short.diagnostic_plot('rvp_plot', predictor='weight')
 
     # ax=None
     _reset_matplotlib()
-    fig = plot_residuals_vs_fitted_values(model_mtcars_short.y,
-                                          model_mtcars_short.resid, ax=None)
+    fig = plot_residuals_vs_predictor_values(model_mtcars_short,
+                                             predictor='wt',
+                                             ax=None)
     assert isinstance(fig, matplotlib.figure.Figure)
     # Actual data:
     actual_data = fig.get_axes()[0].collections[0].get_offsets().data
     sorted_actual_data = actual_data[actual_data[:, 0].argsort()]
     assert_numpy_array_equal(np.round(sorted_actual_data, 5),
-                             sorted_expected_data)
+                             np.round(sorted_expected_data, 5))
 
     # Ax specified
     _reset_matplotlib()
     fig, ax = plt.subplots(figsize=(8, 5))
-    model_mtcars_short.diagnostic_plot('rvf_plot', ax=ax)
+    model_mtcars_short.diagnostic_plot('rvp_plot', predictor='wt', ax=ax)
     assert isinstance(fig, matplotlib.figure.Figure)
 
     # Actual data:
@@ -78,7 +85,7 @@ def test_rvf_plot(model_mtcars_short):
 
 
 @pytest.mark.remote_data
-def test_rvp_plot(model_mtcars_short):
+def test_rvf_plot(model_mtcars_short):
     _reset_matplotlib()
 
     # Expected data, with x-vals sorted in asc order
@@ -97,13 +104,13 @@ def test_rvp_plot(model_mtcars_short):
                    1.73801,  1.2222]])).T
 
     with pytest.raises(ValueError):
-        model_mtcars_short.diagnostic_plot('rvpplot')
+        model_mtcars_short.diagnostic_plot('rvfplot')
 
     # Ax=None:
     _reset_matplotlib()
-    fig = plot_residuals_vs_predicted_values(
-        model_mtcars_short.predict(model_mtcars_short.X.to_numpy()),
-        model_mtcars_short.results.resid, ax=None)
+    fig = plot_residuals_vs_fitted_values(
+        model_mtcars_short.results.resid,
+        model_mtcars_short.results.fittedvalues, ax=None)
     assert isinstance(fig, matplotlib.figure.Figure)
     # Actual data:
     actual_data = fig.get_axes()[0].collections[0].get_offsets().data
@@ -114,7 +121,7 @@ def test_rvp_plot(model_mtcars_short):
     # Ax specified
     _reset_matplotlib()
     fig, ax = plt.subplots(figsize=(8, 5))
-    model_mtcars_short.diagnostic_plot('rvp_plot', ax=ax)
+    model_mtcars_short.diagnostic_plot('rvf_plot', ax=ax)
     assert isinstance(fig, matplotlib.figure.Figure)
     # Actual data:
     actual_data = fig.get_axes()[0].collections[0].get_offsets().data
