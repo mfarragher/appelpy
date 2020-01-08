@@ -76,14 +76,14 @@ The **10 Minutes To Appelpy** notebook shows the results of heteroskedasticity t
 - [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/mfarragher/appelpy-examples/master?filepath=00_ten-minutes-to-appelpy.ipynb): interactive experience of the *10 Minutes to Appelpy* tutorial via Binder.
 - [![nbviewer](https://img.shields.io/badge/render-nbviewer-orange.svg)](https://nbviewer.jupyter.org/github/mfarragher/appelpy-examples/blob/master/00_ten-minutes-to-appelpy.ipynb): static render of the *10 Minutes to Appelpy* notebook.
 
-Here is a code snippet for a heteroskedasticity test.
+Here is a code snippet for a heteroskedasticity test - print statements to show test information returned from the function call.
 ```python
 from appelpy.diagnostics import heteroskedasticity_test
 
-ep, pval = heteroskedasticity_test('breusch_pagan_studentized', model_nonrobust)
-print('Breusch-Pagan test (studentized)')
-print('Test statistic: {:.4f}'.format(ep))
-print('Test p-value: {:.4f}'.format(pval))
+bps_stats = heteroskedasticity_test('breusch_pagan_studentized', model_nonrobust)
+print('Breusch-Pagan test (studentized) :: {}'.format(bps_stats['distribution'] + '({})'.format(bps_stats['nu'])))
+print('Test statistic: {:.4f}'.format(bps_stats['test_stat']))
+print('Test p-value: {:.4f}'.format(bps_stats['p_value']))
 ```
 
 ## Partial regression plot
@@ -107,5 +107,5 @@ Pass a dict for testing of hypotheses against non-zero scalars, where the values
 
 ```python
 hypotheses_object = {('col_u', 'col_v'): 2}  # for the difference between two coefficients
-hypotheses_object = {'col_a' : 2}
+hypotheses_object = {'col_a' : 2}  # for equality of coefficient to a scalar value
 ```
