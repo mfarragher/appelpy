@@ -63,7 +63,7 @@ The key information is sitting in the ``model1`` object, but there is much more 
 
 🍏 What inspired it?
 ====================
-1) The simple syntax of software such as Stata.  With the data loaded, a regression model summary can be returned by a one-line command:::
+1) The simple syntax of software such as Stata.  With the data loaded, a regression model summary can be returned by a one-line command:
 
         regress api00 acs_k3 meals full
 

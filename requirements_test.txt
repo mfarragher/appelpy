@@ -4,3 +4,4 @@ pytest-remotedata
 coverage
 codecov
 tox
+twine

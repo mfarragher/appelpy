@@ -1,6 +1,4 @@
-<header>
 <p style="font-size:28px;"><b>appelpy: Applied Econometrics Library for Python</b></p>
-</header>
 
 **appelpy** is the *Applied Econometrics Library for Python*.  It seeks to bridge the gap between the software options that have a simple syntax (such as Stata) and other powerful options that use Python's object-oriented programming as part of data modelling workflows.  ⚗️
 
