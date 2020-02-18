@@ -94,7 +94,7 @@ def pp_plot(residual_values, *, ax=None):
 
     if ax is None:
         ax = plt.gca()
-    prob_plot = sm.ProbPlot(residual_values)
+    prob_plot = sm.ProbPlot(residual_values, fit=True)
     fig = prob_plot.ppplot(ax=ax, color='tab:blue', markersize=4,
                            line='45')  # Figure returned is passed to subplot
     ax.grid(True, linewidth=0.5)
@@ -119,7 +119,7 @@ def qq_plot(residual_values, *, ax=None):
 
     if ax is None:
         ax = plt.gca()
-    prob_plot = sm.ProbPlot(residual_values)
+    prob_plot = sm.ProbPlot(residual_values, fit=True)
     fig = prob_plot.qqplot(ax=ax, line='s', color='tab:blue',
                            markersize=4)  # Figure to be passed to subplot
     ax.grid(True, linewidth=0.5)
