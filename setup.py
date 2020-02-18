@@ -25,7 +25,7 @@ CLASSIFIERS = [
 
 setuptools.setup(
     name="appelpy",
-    version="0.4.1",
+    version="0.4.2",
     author="Mark Farragher",
     description="Applied Econometrics Library for Python",
     long_description=LONG_DESCRIPTION,
